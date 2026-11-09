@@ -1,0 +1,112 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- ModFramework.dll, the framework's NativeAOT library: the bridge's four exports, mf_start,
+       the topics and the hook of the game's window. Published for linux-bionic-arm64 by
+       Android/build.sh, it is ModFramework.so, the same code for JoiPlay. -->
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <AssemblyName>ModFramework</AssemblyName>
+    <RootNamespace>MGQParadox.ModFramework</RootNamespace>
+    <Product>MGQ Paradox Mod Framework</Product>
+    <Version>0.1.0-dev</Version>
+
+    <!-- The handshake's build and the loader's Version.txt are this version as it is, without the
+         commit the SDK would append. -->
+    <IncludeSourceRevisionInInformationalVersion>false</IncludeSourceRevisionInInformationalVersion>
+
+    <!-- The game is a 32-bit process and only loads a native DLL of its own kind. -->
+    <PublishAot>true</PublishAot>
+    <RuntimeIdentifier Condition="'$(RuntimeIdentifier)' == ''">win-x86</RuntimeIdentifier>
+    <InvariantGlobalization>true</InvariantGlobalization>
+
+    <!-- The game is a 32-bit process with little address space to spare: the collector works on the
+         thread that allocates, with no background thread and its reserve, and gives memory back by
+         compacting its oldest objects. -->
+    <ConcurrentGarbageCollection>false</ConcurrentGarbageCollection>
+    <ServerGarbageCollector>false</ServerGarbageCollector>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <!-- NativeAOT's compiler at 10.0.14, which fixes advisory GHSA-p3jp-9v83-76w9; the SDK brings an
+       older one. -->
+  <ItemGroup>
+    <KnownILCompilerPack Update="Microsoft.DotNet.ILCompiler" ILCompilerPackVersion="10.0.14" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="ModFramework.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <RuntimeHostConfigurationOption Include="System.GC.ConserveMemory" Value="5" />
+  </ItemGroup>
+
+  <!-- The copy of the website's tags rides inside the DLL, so every platform's build carries it
+       (ShippedTags.cs). -->
+  <ItemGroup>
+    <EmbeddedResource Include="Mods\ShippedTags.txt" LogicalName="ShippedTags.txt" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <TrimmerRootAssembly Include="ModFramework" />
+  </ItemGroup>
+
+  <!-- Version.txt beside the published DLL names the version the loader picks a copy by and compares
+       with the DLL's build, so both come from <Version> above. -->
+  <Target Name="WriteVersionFile" AfterTargets="Publish">
+    <WriteLinesToFile File="$(PublishDir)Version.txt" Lines="$(Version)" Overwrite="true" />
+  </Target>
+
+  <!-- The publish for Windows also assembles the release layout in Shipping\, ready to copy into a
+       game folder, and a Release publish zips it as MGQ-Mod-Framework-<version>.zip. The package
+       for JoiPlay is assembled by Android/build.sh. -->
+  <PropertyGroup>
+    <PackageDir>$([MSBuild]::NormalizeDirectory($(MSBuildProjectDirectory), .., Shipping))</PackageDir>
+    <ZipFile>$(MSBuildProjectDirectory)\bin\$(Configuration)\MGQ-Mod-Framework-$(Version).zip</ZipFile>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Of the framework's files only the stub goes directly into the Patch folder, where the
+         game's loader finds it first; every other file goes into Patch\Mod_Framework, the scripts
+         into its Scripts folder and the framework's pictures into its Graphics folder. -->
+    <PatchFile Include="..\GameScript\!Mod_Framework.rb" />
+    <ModFile Include="..\GameScript\Mod_Framework\*" />
+    <ScriptFile Include="..\GameScript\Mod_Framework\Scripts\*.rbx" />
+    <GraphicFile Include="..\GameScript\Mod_Framework\Graphics\*.png" />
+
+    <!-- The first copy of a mod of its own that the zip brings into the Patch folder. The website
+         lists it as its own mod, which owns its updates, so it is no file of the framework. -->
+    <BundledModFile Include="..\Samples\Equipment_Window.rb" />
+
+    <!-- Manifest.txt lists every file of the framework a release ships, so an updater can remove
+         what a later release drops. Mod_Framework.ini and the bundled mods are never in it, so no
+         update or removal of the framework touches the player's settings or those mods. -->
+    <ShippedFile Include="@(PatchFile->'Patch\%(Filename)%(Extension)')" />
+    <ShippedFile Include="Patch\Mod_Framework\$(AssemblyName).dll" />
+    <ShippedFile Include="Patch\Mod_Framework\Version.txt" />
+    <ShippedFile Include="Patch\Mod_Framework\Manifest.txt" />
+    <ShippedFile Include="@(ModFile->'Patch\Mod_Framework\%(Filename)%(Extension)')" />
+    <ShippedFile Include="@(ScriptFile->'Patch\Mod_Framework\Scripts\%(Filename)%(Extension)')" />
+    <ShippedFile Include="@(GraphicFile->'Patch\Mod_Framework\Graphics\%(Filename)%(Extension)')" />
+  </ItemGroup>
+
+  <Target Name="AssemblePackage" AfterTargets="WriteVersionFile" Condition="'$(RuntimeIdentifier)' == 'win-x86'">
+    <RemoveDir Directories="$(PackageDir)" />
+    <Copy SourceFiles="@(PatchFile);@(BundledModFile)" DestinationFolder="$(PackageDir)Patch" />
+    <Copy SourceFiles="$(PublishDir)$(AssemblyName).dll;$(PublishDir)Version.txt;@(ModFile)" DestinationFolder="$(PackageDir)Patch\Mod_Framework" />
+    <Copy SourceFiles="@(ScriptFile)" DestinationFolder="$(PackageDir)Patch\Mod_Framework\Scripts" />
+    <Copy SourceFiles="@(GraphicFile)" DestinationFolder="$(PackageDir)Patch\Mod_Framework\Graphics" />
+    <WriteLinesToFile File="$(PackageDir)Patch\Mod_Framework\Manifest.txt" Lines="@(ShippedFile)" Overwrite="true" />
+    <Message Importance="high" Text="$(MSBuildProjectName) -> $(PackageDir)" />
+  </Target>
+
+  <Target Name="ZipPackage" AfterTargets="AssemblePackage" Condition="'$(Configuration)' == 'Release' And '$(RuntimeIdentifier)' == 'win-x86'">
+    <ZipDirectory SourceDirectory="$(PackageDir)" DestinationFile="$(ZipFile)" Overwrite="true" />
+    <Message Importance="high" Text="$(MSBuildProjectName) -> $(ZipFile)" />
+  </Target>
+
+</Project>

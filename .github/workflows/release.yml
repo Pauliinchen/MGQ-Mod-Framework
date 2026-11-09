@@ -1,0 +1,124 @@
+# Publishing a release on GitHub (tag e.g. v0.1.0) runs every test, builds the framework at that
+# tag and attaches MGQ-Mod-Framework-<version>.zip and the package for Android,
+# MGQ-Mod-Framework-<version>-android.zip, to that release. Nothing to upload by hand.
+#
+# Run it by hand from the Actions tab with a release's tag to build and attach the zip again, for
+# example after a failed run. It builds the code at that tag with this workflow from main, so the
+# release and its tag stay as they are.
+name: Release
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: Tag of the published release, e.g. v0.1.0
+        required: true
+
+permissions:
+  contents: write   # needed to attach the zip to the release
+
+jobs:
+  build:
+    runs-on: windows-latest
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.TAG }}
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.3'
+
+      - name: Read the version from the tag
+        shell: pwsh
+        run: |
+          $version = $env:TAG.TrimStart("v")
+          if ($version -notmatch '^\d+\.\d+\.\d+$') { throw "The tag $env:TAG names no version x.y.z." }
+          "VERSION=$version" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
+
+      # The zips bring the first copy of the Equipment Window, its own mod on the website. A copy no
+      # website version holds leaves every new player with a changed copy the Browser cannot remove.
+      - name: Check that the Equipment Window is a version on the website
+        shell: pwsh
+        run: |
+          $bytes = [IO.File]::ReadAllBytes("Samples/Equipment_Window.rb")
+          $sha = [Security.Cryptography.SHA256]::Create()
+          $hashes = @($bytes, [byte[]]@($bytes | Where-Object { $_ -ne 13 })) | ForEach-Object { [BitConverter]::ToString($sha.ComputeHash($_)).Replace("-", "").ToLower() }
+          $mod = try { (Invoke-RestMethod "https://mgqonline.org/api/mods/equipment-window?schema=3").mod } catch { $null }
+          $listed = @($mod.versions | Where-Object { $_.files | Where-Object { $_.path -eq "Equipment_Window.rb" -and $hashes -contains $_.sha256 } })
+          if (-not $listed) { "::warning::Samples/Equipment_Window.rb is no version of equipment-window on the website. Upload it there as a new version." }
+          else { "Equipment_Window.rb is version $($listed[0].version) of equipment-window on the website." }
+
+      - name: Test the scripts
+        run: ruby GameScript/Tests/run.rb
+
+      # The runner's Visual Studio brings the C++ linker NativeAOT needs for the DLL. The publish
+      # writes Version.txt beside the DLL, assembles Shipping\ and zips it.
+      - name: Publish
+        shell: pwsh
+        run: dotnet publish ModFramework -c Release -r win-x86 -p:Version=$env:VERSION
+
+      # The tests run 32-bit like the game, so they need the x86 runtime next to the x64 SDK. A
+      # failing test ends the job here, before the zip is attached.
+      - name: Install the x86 .NET runtime
+        shell: pwsh
+        run: |
+          Invoke-WebRequest https://dot.net/v1/dotnet-install.ps1 -OutFile dotnet-install.ps1
+          ./dotnet-install.ps1 -Channel 10.0 -Runtime dotnet -Architecture x86 -InstallDir "${env:ProgramFiles(x86)}\dotnet"
+
+      # setup-dotnet points DOTNET_ROOT at the x64 install, which a 32-bit app would follow and fail
+      # to load. DOTNET_ROOT_X86 comes first for a 32-bit app. The DLL's tests read the published
+      # DLL and its Version.txt, so they build with the same version.
+      - name: Test
+        shell: pwsh
+        env:
+          DOTNET_ROOT_X86: C:\Program Files (x86)\dotnet
+        run: |
+          dotnet run --project ModFramework.Tests --property:Version=$env:VERSION
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Attach zip to the release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload $env:TAG "ModFramework/bin/Release/MGQ-Mod-Framework-$env:VERSION.zip" --clobber
+
+  # The package for JoiPlay on Android: the same code built for linux-bionic-arm64 with the NDK by
+  # Android/build.sh, which checks the zip, attached as MGQ-Mod-Framework-<version>-android.zip.
+  # It waits for the build above, so a failing test attaches neither zip.
+  android:
+    needs: build
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ github.event.release.tag_name || inputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ env.TAG }}
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - uses: nttld/setup-ndk@v1
+        id: ndk
+        with:
+          ndk-version: r28c
+
+      - name: Build and check
+        env:
+          ANDROID_NDK_ROOT: ${{ steps.ndk.outputs.ndk-path }}
+        run: bash Android/build.sh "${TAG#v}"
+
+      - name: Attach zip to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$TAG" "ModFramework/bin/Release/MGQ-Mod-Framework-${TAG#v}-android.zip" --clobber

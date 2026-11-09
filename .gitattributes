@@ -1,0 +1,6 @@
+# the stub and boot.rbx, its code under another header, ship with the same line endings in every release and every zip
+GameScript/!Mod_Framework.rb text eol=crlf
+GameScript/Mod_Framework/boot.rbx text eol=crlf
+
+# shell scripts run on Linux
+*.sh text eol=lf
