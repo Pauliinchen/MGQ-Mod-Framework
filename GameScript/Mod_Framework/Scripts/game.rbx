@@ -2,6 +2,7 @@
 #  game.rbx
 #
 #  Changelog:
+#      Paulinchen  2026-11-10: Asked the game whether a character can wear an item of the bag only once until the character changes
 #      Paulinchen  2026-11-09: Removed the equip writer, Optimize, Clear and the favorite toggle, which the Equipment Window does itself
 #      Paulinchen  2026-11-08: Found the scene's top viewport for a root that follows a character on the scene's map
 #      Paulinchen  2026-11-07: Named the type helper type_filters, as chips no longer filter
@@ -459,8 +460,9 @@ module Mod_Framework
         remove = options.fetch(:remove_text, REMOVE_TEXT)
         rows = actor.equips[slot] && !remove.nil? ? [{ :text => remove.to_s, :remove => true, :search => false, :data => REMOVE }] : []
         items = $game_party ? $game_party.equip_items.uniq : []
+        kept = kept_fits(actor, slot)
         items.each do |item|
-          next unless fits_slot?(actor, slot, item)
+          next unless kept_fit?(kept, actor, slot, item)
 
           row = { :item => item, :bag => true, :count => true, :data => item }
           row[:icons] = [favorite_icon].compact if favorite?(item)
@@ -854,6 +856,21 @@ module Mod_Framework
         actor.respond_to?(:equippable_slot?) ? actor.equippable_slot?(slot, item) : item.etype_id == actor.equip_slots[slot]
       end
       private_class_method :fits_slot?
+
+      # Tells whether a character can wear an item in a slot, asking the game only for an item the
+      # kept answers lack.
+      #
+      # @param kept [Hash, nil] The answers kept for the character's slot, see kept_fits; nil keeps none.
+      # @param actor [Game_Actor] The character.
+      # @param slot [Integer] The slot.
+      # @param item [RPG::BaseItem] The item.
+      # @return [Boolean] Whether it can.
+      def self.kept_fit?(kept, actor, slot, item)
+        return fits_slot?(actor, slot, item) unless kept
+
+        kept.key?(item) ? kept[item] : kept[item] = fits_slot?(actor, slot, item)
+      end
+      private_class_method :kept_fit?
     end
 
     Run.on_start("character sprites") { Mod_Framework::UI::Game.watch_character_sprites }

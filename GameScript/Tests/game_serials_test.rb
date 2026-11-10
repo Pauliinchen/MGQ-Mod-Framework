@@ -2,6 +2,7 @@
 #  game_serials_test.rb
 #
 #  Changelog:
+#      Paulinchen  2026-11-10: Checked that the equip rows ask the game once per item until the character changes
 #      Paulinchen  2026-11-06: Named a persona's first id in its data, as Paradox does
 #                            - Checked that a character whose persona changed keeps its own count
 #                            - Checked that a character not made yet is not made by its own bump
@@ -137,6 +138,19 @@ in_game_folder do
     game.mhp(ana)
     game.mhp(bea)
     check("a gem set bumps :gear and renews every kept max", [game.serial(:gear) - gear, $max_reads - reads], [1, 2])
+
+    # The equip list asks the game about every item of a late-game bag, which took longer than a frame on each cursor move.
+    asked = []
+    def ana.equips; @equips; end
+    ana.define_singleton_method(:equippable?) { |item| asked << item; true }
+    def ana.equippable_slot?(_slot, _item); true; end
+    $game_party = Object.new
+    def $game_party.equip_items; [:sword, :shield]; end
+    2.times { game.equip_rows(ana, 0) }
+    once = asked.size
+    ana.change_equip(0, 120)
+    game.equip_rows(ana, 0)
+    check("the equip rows ask the game once per item of the bag, and again once the character changed gear [asked, asked after]", [once, asked.size], [2, 4])
 
     # The party gains a member, gold and an item; an enemy takes a hit.
     party = Game_Party.new

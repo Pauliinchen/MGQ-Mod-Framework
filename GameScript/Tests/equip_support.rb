@@ -2,6 +2,7 @@
 #  equip_support.rb
 #
 #  Changelog:
+#      Paulinchen  2026-11-10: Gave the bag the items the gems are read from
 #      Paulinchen  2026-11-09: Gave the characters no states, which the Equipment Window reads for its stats
 #      Paulinchen  2026-11-07: Gave the party its fighting members, every member
 #      Paulinchen  2026-11-04: Took in the Equipment Window's characters and party from the fixtures' script
@@ -256,6 +257,11 @@ class FakeParty
   # @return [Array] The items it holds, in its order.
   def all_items
     @counts.keys.select { |item| @counts[item] > 0 }
+  end
+
+  # @return [Array] The items it holds, in its order; the gems read only these.
+  def items
+    all_items
   end
 
   # @return [Integer] How many of an item it holds.

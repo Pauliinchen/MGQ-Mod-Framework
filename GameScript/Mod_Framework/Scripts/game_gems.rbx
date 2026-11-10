@@ -2,6 +2,7 @@
 #  game_gems.rbx
 #
 #  Changelog:
+#      Paulinchen  2026-11-10: Read the bag's gems from its items alone
 #      Paulinchen  2026-11-09: Removed setting, taking out and clearing gems, which the Equipment Window does itself
 #      Paulinchen  2026-11-07: Named the color helper color_filters, as chips no longer filter
 #                            - Created
@@ -81,9 +82,12 @@ module Mod_Framework
         # Tells the gems the game offers for its sockets: those in the bag, in its order; the
         # storehouse's are not offered.
         #
+        # Gems are items, so the weapons and armors stay unread, which a late-game bag holds
+        # thousands of.
+        #
         # @return [Array<RPG::Item>] The gems.
         def self.bag
-          $game_party ? $game_party.all_items.select { |item| gem?(item) } : []
+          $game_party ? $game_party.items.select { |item| gem?(item) } : []
         end
 
         # Tells whether an item is a gem, as the game's gem list takes it.

@@ -2,6 +2,7 @@
 #  game_serials.rbx
 #
 #  Changelog:
+#      Paulinchen  2026-11-10: Kept whether a character can wear each item of the bag in a slot until the character changes
 #      Paulinchen  2026-11-06: Found a character by its id and its first persona's id instead of going through every character
 #                              made on each change
 #                            - Found a character among the characters made, a persona changed too, and never looked one up
@@ -319,6 +320,14 @@ module Mod_Framework
       # The game's characters the kept values belong to, so a loaded save forgets them.
       @kept_of = nil
 
+      # Whether each character can wear each item in a slot, by character, slot and item, renewed
+      # with its max values, since an equip list asks the game for every item of the bag, which takes
+      # longer than a frame on a late-game save.
+      @fits = {}
+
+      # The count of the switches the kept fits belong to, since Paradox's enchant switch turns items off.
+      @fits_switches = nil
+
       # Tells the party's members; a render that reads them renders again when the party changes.
       #
       # @return [Array<Game_Actor>] The members.
@@ -481,11 +490,12 @@ module Mod_Framework
         Engine::Serials.serial(name, actor)
       end
 
-      # Forgets a character's kept max values, or everyone's.
+      # Forgets a character's kept max values and the items it can wear, or everyone's.
       #
       # @param actor [Game_Actor, nil] The character, nil for everyone.
       def self.renew(actor = nil)
         actor ? @kept.delete(actor) : @kept.clear
+        actor ? @fits.delete(actor) : @fits.clear
         nil
       end
 
@@ -496,19 +506,43 @@ module Mod_Framework
       def self.kept(battler)
         return [battler.mhp, battler.mmp] unless Engine::Serials.character?(battler)
 
-        unless $game_actors.equal?(@kept_of)
-          @kept.clear
-          Engine::Serials.forget_characters
-          @kept_of = $game_actors
-        end
+        forget_on_load
         @kept[battler] ||= [battler.mhp, battler.mmp]
       end
       private_class_method :kept
 
-      # The serials whose change may move a character's max HP and MP.
+      # Tells the kept answers of whether a character can wear each item in a slot.
+      #
+      # @param actor [Game_Actor] The character.
+      # @param slot [Integer] The slot.
+      # @return [Hash, nil] Whether it can, by item; nil for a battler that is no character, such as
+      #   a copy Optimize tries gear on, which nothing may hold.
+      def self.kept_fits(actor, slot)
+        return nil unless Engine::Serials.character?(actor)
+
+        forget_on_load
+        switches = Engine::Serials.serial(:switch)
+        @fits.clear unless switches == @fits_switches
+        @fits_switches = switches
+        (@fits[actor] ||= {})[slot] ||= {}
+      end
+      private_class_method :kept_fits
+
+      # Forgets every kept value once a loaded save brought characters of its own.
+      def self.forget_on_load
+        return if $game_actors.equal?(@kept_of)
+
+        @kept.clear
+        @fits.clear
+        Engine::Serials.forget_characters
+        @kept_of = $game_actors
+      end
+      private_class_method :forget_on_load
+
+      # The serials whose change may move a character's max HP and MP and the items it can wear.
       RENEWED_BY = [:gear, :states, :level]
 
-      # Forgets the kept max values once a change may move them.
+      # Forgets the kept values once a change may move them.
       Engine::Serials.follow do |name, actor, everyone|
         Mod_Framework::UI::Game.renew(actor) if RENEWED_BY.include?(name) && (actor || everyone)
       end

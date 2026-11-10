@@ -2,6 +2,7 @@
 #  game_equip_info.rbx
 #
 #  Changelog:
+#      Paulinchen  2026-11-10: Read the size of the armors without copying them on every gem read
 #      Paulinchen  2026-11-09: Removed the lines and the summary of gems in a tooltip's box, which the Equipment Window builds itself
 #                            - Told a gem's description without its tag to anyone who asks
 #      Paulinchen  2026-11-07: Removed kind_chips, which nothing called
@@ -115,10 +116,12 @@ module Mod_Framework
 
         # Reads a gem alone, once per gem while the database stays the same.
         #
+        # Paradox's armors are no Array, and Array() copied the whole database on every call.
+        #
         # @param gem [RPG::Item] The gem.
         # @return [EquipInfo] What it reads.
         def self.of_gem(gem)
-          stamp = [$data_armors.object_id, Array($data_armors).size]
+          stamp = [$data_armors.object_id, $data_armors.respond_to?(:size) ? $data_armors.size : 0]
           @gem_reads = {} unless @gem_stamp == stamp
           @gem_stamp = stamp
           @gem_reads[gem] ||= new(nil, [], armors_of([gem]), gem)
