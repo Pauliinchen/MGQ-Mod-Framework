@@ -30,7 +30,8 @@ end
 - `Options.value(key)` reads the player's pick, else the default, such as while no game is loaded.
 - `Options.keep(key, name, help, values, read, write)` keeps a value your mod keeps itself, the same
   in every save, such as in [Settings](settings.md): `values` lists the texts the row shows (or a
-  lambda answers them), `read` answers the current one, and `write` takes the one picked.
+  lambda answers them), `read` answers the current one, and `write` takes the one picked. The rows
+  ask `read` again every few frames while they show, so a value your mod changes elsewhere shows.
 - Both take `disabled: -> { ... }` (greyed out while true) and `if: -> { ... }` (shown only while
   true).
 - `Options.mods` lists the mods that have rows that show now, and `Options.rows_of("Camp Notes")`

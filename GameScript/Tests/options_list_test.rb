@@ -2,6 +2,7 @@
 #  options_list_test.rb
 #
 #  Changelog:
+#      Paulinchen  2026-11-10: Checked that Interface Positions says Moved once a box moved after Default
 #      Paulinchen  2026-11-07: Expected the hotkey rows last under the Hotkeys caption
 #                            - Added the options list without the removed builder
 #      Paulinchen  2026-11-06: Checked that the rows ask for the room of all of them and give back what their window lacks
@@ -22,7 +23,8 @@
 
 # Covers options_list.rbx in a booted game against FakeTree: the rows of Options > Mods under a
 # heading per mod with the help line, asking for the room of every row; a value stepped, a button
-# row, and a key row that refuses taken keys, binds a free one and keeps its key on Esc.
+# row, a key row that refuses taken keys, binds a free one and keeps its key on Esc, and a value a mod
+# changed elsewhere.
 
 require_relative "tree_support"
 
@@ -134,5 +136,22 @@ in_game_folder do
     frame
     check("Esc keeps the key", [$chat_key, list.row_at(6)[:value], ui::Engine::OptionsList.waiting?], [KEY_T, "T", false])
     window.close
+
+    # The player puts every box back with Default in Interface Positions, then moves a box with Alt
+    # while the row shows; it showed Default until another row changed.
+    layout = ui::Engine::Layout
+    layout.register(:notes_box, "Notes box")
+    layout.take_event("store" => { "notes_box" => "5,5,300,120" })
+    positions = ui::Engine::Window.new(:size => [400, 100])
+    row = positions.add(ui::Engine::OptionsList.new(:headings => false, :only => lambda { |each| each[:key] == layout::OPTION })).list
+    positions.open
+    frame
+    tree.post("events", [[row.node, "side", 0, 1]])
+    frame
+    after_default = row.row_at(0)[:value]
+    layout.take_event("store" => { "notes_box" => "40,40,300,120" })
+    ui::Engine::OptionsList::VALUES_EVERY.times { frame }
+    check("Interface Positions says Moved once a box moved after Default [after Default, after the move]", [after_default, row.row_at(0)[:value]], ["Default", "Moved"])
+    positions.close
   end
 end

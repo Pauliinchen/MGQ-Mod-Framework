@@ -2,6 +2,7 @@
 #  options_list.rbx
 #
 #  Changelog:
+#      Paulinchen  2026-11-10: Showed a row's value anew once a mod changed it elsewhere, such as Interface Positions after a box moved
 #      Paulinchen  2026-11-07: Showed the Hotkeys caption only under a mod's other rows
 #                            - Listed each mod's hotkey rows after its other rows, under a small Hotkeys caption
 #                            - Showed a help of its caller's while its rows lack the focus
@@ -73,6 +74,10 @@ module Mod_Framework
 
         # The caption over a mod's hotkey rows.
         HOTKEYS_CAPTION = "Hotkeys"
+
+        # The frames between two reads of the rows' values while it shows, since a mod may change a
+        # value elsewhere, such as Interface Positions once the player moved a box.
+        VALUES_EVERY = 10
 
         # What a key row's value reads while it waits for its key.
         WAITING_TEXT = "Press a key . . ."
@@ -190,8 +195,28 @@ module Mod_Framework
           rows = rows.select { |row| only.call(row) } if only
           Array(@options[:patched_rows]).each { |patch| rows = patch.call(rows) }
           @list.rows = list_rows(rows)
+          @shown_rows = rows
+          @shown_values = values_of(rows)
           show_help
           self
+        end
+
+        # Reads the rows' values every VALUES_EVERY frames while it shows, and shows the rows anew once
+        # one changed elsewhere; not while a key row waits for its key.
+        #
+        # @return [Boolean] Always true, while it shows.
+        def frame_tick
+          @ticks = @ticks.to_i + 1
+          refresh if (@ticks % VALUES_EVERY).zero? && !@waiting_row && values_of(@shown_rows) != @shown_values
+          true
+        end
+
+        # Draws it, and reads its rows' values from then on while it shows.
+        #
+        # @param canvas [Canvas] Where it draws.
+        def draw(canvas)
+          Tree.ticking(self, true)
+          super
         end
 
         # Follows a changed option: another source or filter of the rows reads them anew, another
@@ -275,6 +300,14 @@ module Mod_Framework
             shown += keys.map { |place, name| list_row(rows[place], name) }
             @options[:headings] == false ? shown : [{ :heading => group }] + shown
           end.flatten(1)
+        end
+
+        # Tells the values rows show, nil for a row without one.
+        #
+        # @param rows [Array<Hash>] The rows of Options > Mods.
+        # @return [Array<String, nil>] The values as the rows show them.
+        def values_of(rows)
+          rows.map { |row| row[:sub] || Options.key_row?(row) ? Options.value_text(row) : nil }
         end
 
         # Turns one row of Options > Mods into the list's.
