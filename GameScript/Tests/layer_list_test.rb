@@ -2,6 +2,7 @@
 #  layer_list_test.rb
 #
 #  Changelog:
+#      Paulinchen  2026-11-10: Covered a step of a dim arrow, which tells on_refuse the herb and the step
 #      Paulinchen  2026-11-09: Covered a filter that keeps some rows, a pick among them and the row that says none is left
 #      Paulinchen  2026-11-07: Dropped cancel_to:, which the cancel rule replaces
 #      Paulinchen  2026-11-06: Covered a pick that goes on into the slots, from where cancel comes back to the bag
@@ -14,7 +15,8 @@
 # FakeTree, through a mod's camp bag: items with their icon and count, a character's slots given as
 # rows of their own, a pick that hands back the item, not its row, and goes on into the slots, a
 # pouch whose filter keeps some rows and says so when it keeps none, and the herbs a trade gives:
-# rows whose value Left and Right step within the count, each herb's description as its tooltip.
+# rows whose value Left and Right step within the count, a step past it told to on_refuse, each
+# herb's description as its tooltip.
 
 require_relative "layer_support"
 require_relative "equip_support"
@@ -54,10 +56,12 @@ BAG_ROWS = <<-RUBY
     class GiveWindow < UI::Component
       param :bag
       state(:given) { {} }
+      state(:refused) { [] }
 
       def render
         window "Give to Mia" do
-          list bag, row: ->(herb) { give_row(herb) }, describe: true, on_side: ->(herb, step) { give(herb, step) }
+          list bag, row: ->(herb) { give_row(herb) }, describe: true, on_side: ->(herb, step) { give(herb, step) },
+                     on_refuse: ->(herb, step) { self.refused = refused + [[herb.name, step]] }
         end
       end
 
@@ -113,8 +117,8 @@ in_game_folder do
           [["Throw away", false], ["No item matches", true]])
     ui::Engine::Layer.tops.last.handle.close
 
-    # The trade's herbs: Right gives one more herb, up to the count, and Left one fewer; each row
-    # tells the herb's description as its tooltip.
+    # The trade's herbs: Right gives one more herb, up to the count, past which it buzzes and tells
+    # on_refuse, and Left one fewer; each row tells the herb's description as its tooltip.
     herb = Camp_Rows::Herb.new("Herb", 176, 2, "Heals a little.")
     ui.open(Camp_Rows::GiveWindow, bag: [herb])
     frame
@@ -125,7 +129,8 @@ in_game_folder do
     check("two steps right give both herbs", [give.given, list.rows[0].values_at(:value, :less, :more)], [{ "Herb" => 2 }, ["2 / 2", true, false]])
     $sounds = []
     tell(tree, [[list.node, "side", 0, 1]])
-    check("a third step right buzzes and gives nothing more", [$sounds, give.given], [[:buzzer], { "Herb" => 2 }])
+    check("a third step right buzzes, gives nothing more and tells on_refuse the herb and the step", [$sounds, give.given, give.refused],
+          [[:buzzer], { "Herb" => 2 }, [["Herb", 1]]])
     tell(tree, [[list.node, "side", 0, -1]])
     check("a step left gives one fewer", list.rows[0][:value], "1 / 2")
     shown = []

@@ -2,6 +2,7 @@
 #  components_list.rbx
 #
 #  Changelog:
+#      Paulinchen  2026-11-10: Told refuse with the step of a dim arrow Left or Right pressed
 #      Paulinchen  2026-11-09: Kept a table cell's avatar picture scaled at any factor with the list
 #                            - Scaled a table cell's avatar picture at any factor with scale: :auto
 #                            - Drew a table cell's avatar face in its hue
@@ -121,7 +122,7 @@ module Mod_Framework
       # a click on the cursor's row, a double click or Enter), moved (row, from, to: a row carried was
       # dropped, or put back, then at the place it came from, or move_row moved it), side (row, index,
       # step: -1 or 1), toggle (row, index, toggle index), refuse (row, index: a pick of a row that
-      # takes none).
+      # takes none; row, index, step: a step of a dim arrow).
       class List < Component
         # The component's kind in C#'s tree.
         KIND = "list"
@@ -888,14 +889,19 @@ module Mod_Framework
           focused && box.holds?(focused) ? true : false
         end
 
-        # Steps a row's value, unless the row takes no pick or the arrow that way is off (its :less or
-        # :more false), which buzzes and tells nothing.
+        # Steps a row's value, unless the row takes no pick, which buzzes and tells nothing, or the
+        # arrow that way is off (its :less or :more false), which buzzes and tells refuse with the step.
         #
         # @param place [Integer] The row's place.
         # @param step [Integer] -1 or 1.
         def side(place, step)
           row = row_at(place)
-          return Sound.play_buzzer if refuses?(row) || (row.is_a?(Hash) && row[step < 0 ? :less : :more] == false)
+          return Sound.play_buzzer if refuses?(row)
+
+          if row.is_a?(Hash) && row[step < 0 ? :less : :more] == false
+            Sound.play_buzzer
+            return emit(:refuse, row, place, step)
+          end
 
           emit(:side, row, place, step)
         end

@@ -278,8 +278,8 @@ list herbs, describe: true, on_side: ->(herb, step) { give(herb, step) },
 A row with `value:` shows it at its right end between two arrows. Left and Right step it and stay
 in the row; a click on the value's left or right half does the same. `on_side` gets the item and
 -1 or 1, and the row shows its new value once the items say so. `less: false` or `more: false`
-dims that arrow, and a step that way buzzes. `describe: true` shows the game's description of a
-row's `item:` as its tooltip.
+dims that arrow, and a step that way buzzes and tells `on_refuse` the item and the step, the place
+to say why. `describe: true` shows the game's description of a row's `item:` as its tooltip.
 
 ### Dense rows
 
@@ -331,7 +331,7 @@ Written `list items, ...`.
 | `text:` | a lambda of one item, or its method name |  |  | an item's row text; the item itself by default |
 | `icon:` | a lambda of one item, or its method name |  |  | an item's icon before its text: an IconSet index, a name UI.icon gave one, or { file: } |
 | `right:` | a lambda of one item, or its method name |  |  | what an item's row says at its right end, such as a count; on a card, at the end of its name line, such as its version |
-| `row:` | a lambda of one item, or its method name |  |  | an item's whole row, a Hash of :text, :icon, :right (a text, or parts [{ text:, icon:, color: }]), :right_color, :color, :disabled, :tooltip, :item (a game item shown as the game's menus show it), :faint, :label (a caption in the system color in a column before its text, see label_width:), :check (true or false draws an on/off box at its start, filled while true, nil none; confirm and a click on the box tell on_submit), :note and :note_color (a small text after its text, from the column note_at:, dim unless told), :badge and :badge_color (a count above 0 on a plate at its end, "9+" above 9, true a dot, gold unless told; its room kept while it shows nothing), and :value with :less and :more (a value at its right end that Left and Right step, see on_side; less: false or more: false dims that arrow and buzzes a step that way), :cells (its texts in the list's columns, see cells:); a row { heading: "Online (2)" } heads the rows under it across the whole row and the cursor passes over it; an item that is such a Hash is its own row |
+| `row:` | a lambda of one item, or its method name |  |  | an item's whole row, a Hash of :text, :icon, :right (a text, or parts [{ text:, icon:, color: }]), :right_color, :color, :disabled, :tooltip, :item (a game item shown as the game's menus show it), :faint, :label (a caption in the system color in a column before its text, see label_width:), :check (true or false draws an on/off box at its start, filled while true, nil none; confirm and a click on the box tell on_submit), :note and :note_color (a small text after its text, from the column note_at:, dim unless told), :badge and :badge_color (a count above 0 on a plate at its end, "9+" above 9, true a dot, gold unless told; its room kept while it shows nothing), and :value with :less and :more (a value at its right end that Left and Right step, see on_side; less: false or more: false dims that arrow and buzzes a step that way, see on_refuse), :cells (its texts in the list's columns, see cells:); a row { heading: "Online (2)" } heads the rows under it across the whole row and the cursor passes over it; an item that is such a Hash is its own row |
 | `cells:` | an Array |  |  | the widths of the columns the rows' cells: stand in, such as [52, 172, nil, 64], each in pixels or nil to share the room left; a cell is a text, { text:, color:, typo:, align: :start, :center or :end } or { icons: [...] }, each cut with "..." to its column; a cell's avatar: { character:, index:, face:, hue:, image:, shape:, size:, width:, height: } draws that avatar before its text, and the rows grow to the highest avatar and 2 px above and below it |
 | `describe:` | true, false | `false` |  | a row of a game item (its :item) shows the item's description as its tooltip, unless the row has a tooltip: of its own |
 | `escapes:` | true, false | `false` |  | the rows draw the game's text codes |
@@ -367,7 +367,7 @@ Written `list items, ...`.
 | `on_toggle` | the item and the place of its toggle the player pressed, from 0; the toggle shows its new state once the items say so |
 | `on_reorder` | the item the player moved and its new place among the items; the rows show the new order once the items have it |
 | `on_side` | Left or Right stepped the value of an item's row: the item and -1 or 1; the row shows its new value once the items say so |
-| `on_refuse` | the item of a row with disabled: true the player tried to pick, which buzzed |
+| `on_refuse` | the item of a row with disabled: true the player tried to pick, or the item and -1 or 1 of a step of a dim arrow, which buzzed |
 | `on_page` | Q or W, or a gamepad's shoulder without tabs in view, reached it from the focus upward: -1 for the page before, 1 for the next |
 
 **Keys:** Up/Down, Page Up/Down and Home/End move; confirm picks; Left and Right walk a row's toggles and confirm presses one; on a row with a value Left and Right step it and stay in the row at its end; the keys skip a list without bind:, bind_index:, on_submit:, on_change:, on_toggle:, on_side: or reorder:, which shows rows to read: no cursor, and the pointer neither lights nor picks them, while their tooltips show

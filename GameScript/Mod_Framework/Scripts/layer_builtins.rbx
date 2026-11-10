@@ -2,6 +2,7 @@
 #  layer_builtins.rbx
 #
 #  Changelog:
+#      Paulinchen  2026-11-10: Told a list's on_refuse the item and the step of a dim arrow Left or Right pressed
 #      Paulinchen  2026-11-09: Gave an image scale: :auto, which scales it to its room at any factor keeping its proportions, and sampling:
 #                            - Passed padding_shrinks: on to every part
 #                            - Gave a text fit:, which cuts a line too wide, squeezes it into its width or narrows it
@@ -1526,7 +1527,7 @@ module Mod_Framework
                                                            ":note and :note_color (a small text after its text, from the column note_at:, dim unless told), " \
                                                            ":badge and :badge_color (a count above 0 on a plate at its end, \"9+\" above 9, true a dot, gold unless told; its room kept while it shows nothing), " \
                                                            "and :value with :less and :more (a value at its right end that Left and Right step, see on_side; less: false or more: false dims that arrow " \
-                                                           "and buzzes a step that way), :cells (its texts in the list's columns, see cells:); a row { heading: \"Online (2)\" } heads the rows under it " \
+                                                           "and buzzes a step that way, see on_refuse), :cells (its texts in the list's columns, see cells:); a row { heading: \"Online (2)\" } heads the rows under it " \
                                                            "across the whole row and the cursor passes over it; an item that is such a Hash is its own row" },
                                          :cells => { :type => :array,
                                                      :doc => "the widths of the columns the rows' cells: stand in, such as [52, 172, nil, 64], each in pixels or nil to share the room left; " \
@@ -1576,7 +1577,7 @@ module Mod_Framework
                                          :toggle => "the item and the place of its toggle the player pressed, from 0; the toggle shows its new state once the items say so",
                                          :reorder => "the item the player moved and its new place among the items; the rows show the new order once the items have it",
                                          :side => "Left or Right stepped the value of an item's row: the item and -1 or 1; the row shows its new value once the items say so",
-                                         :refuse => "the item of a row with disabled: true the player tried to pick, which buzzed" }.merge(PAGE_EVENT),
+                                         :refuse => "the item of a row with disabled: true the player tried to pick, or the item and -1 or 1 of a step of a dim arrow, which buzzed" }.merge(PAGE_EVENT),
                             :keys => "Up/Down, Page Up/Down and Home/End move; confirm picks; Left and Right walk a row's toggles and confirm presses one; " \
                                      "on a row with a value Left and Right step it and stay in the row at its end; " \
                                      "the keys skip a list without bind:, bind_index:, on_submit:, on_change:, on_toggle:, on_side: or reorder:, which shows rows to read: no cursor, and the pointer neither lights nor picks them, while their tooltips show",
@@ -1622,7 +1623,7 @@ module Mod_Framework
                               part.engine.on(:side) { |_row, index, step| Layer.dispatch(part, :on_side, [Layer.item_at(part, index), step]) }
                               part.engine.on(:submit) { |_row, index| Layer.list_submitted(part, index) }
                               part.engine.on(:toggle) { |_row, index, toggle| Layer.dispatch(part, :on_toggle, [Layer.item_at(part, index), toggle]) }
-                              part.engine.on(:refuse) { |_row, index| Layer.dispatch(part, :on_refuse, [Layer.item_at(part, index)]) }
+                              part.engine.on(:refuse) { |_row, index, step| Layer.dispatch(part, :on_refuse, [Layer.item_at(part, index), step]) }
                               part.engine.on(:moved) { |_row, from, to| Layer.list_reordered(part, from, to) }
                               wire_page(part)
                             end)
