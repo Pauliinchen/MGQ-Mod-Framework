@@ -2,6 +2,7 @@
 #  colors.rbx
 #
 #  Changelog:
+#      Paulinchen  2026-11-10: Read a color given by its values for every part, and ended the unknown color lines in full sentences
 #      Paulinchen  2026-11-07: Let a pulse go through any number of colors and gave mods the rainbow's colors as UI::RAINBOW
 #                            - Left the game windows their own outline round a dark text
 #      Paulinchen  2026-11-06: Worked out the slides and pulses here instead of in C#
@@ -233,12 +234,12 @@ module Mod_Framework
         # Logs once that a text or a part names a color nobody named, with the nearest name.
         #
         # @param component [Component] The part.
-        # @param name [Symbol] The name.
+        # @param name [Object] The name, or the value given as a color.
         def self.unknown(component, name)
           return unless Logging.first_time?(Colors, [:unknown, name])
 
           near = Declarations.nearest(name, Declarations.color_names)
-          component.mod_log("#{component.describe} names the color #{name.inspect}, which is no color name#{near ? "; did you mean #{near.inspect}?" : ''} It draws in the text color")
+          component.mod_log("#{component.describe} names the color #{name.inspect}, which is no color name#{near ? "; did you mean #{near.inspect}?" : '.'} It draws in the text color.")
         end
 
         # Lets the game's own windows take a color name in the text code \C, such as \C[legendary],
@@ -273,7 +274,7 @@ module Mod_Framework
         # @param name [Symbol] The name.
         def self.game_unknown(name)
           near = Declarations.nearest(name, Declarations.color_names)
-          log_once([:unknown, name], "a game window's text names the color #{name.inspect}, which is no color name#{near ? "; did you mean #{near.inspect}?" : ''} It draws in the normal color")
+          log_once([:unknown, name], "a game window's text names the color #{name.inspect}, which is no color name#{near ? "; did you mean #{near.inspect}?" : '.'} It draws in the normal color.")
         end
         private_class_method :game_unknown
 
@@ -301,11 +302,19 @@ module Mod_Framework
         # @param value [Object] The value.
         # @return [Color, nil] The color, nil for none.
         def self.color_of(value)
+          given(value) || (value.is_a?(Symbol) ? Palette.live.named(value) : nil)
+        end
+
+        # Reads a color given by its values, as a color name may be given anywhere: a Color,
+        # [r, g, b(, a)] or "#RRGGBB".
+        #
+        # @param value [Object] The value.
+        # @return [Color, nil] The color, nil for a name or no color.
+        def self.given(value)
           return value if value.is_a?(Color)
           return Color.new(*value) if value.is_a?(Array) && [3, 4].include?(value.size) && value.all? { |each| each.is_a?(Integer) }
-          return Color.new(*[value[1, 6]].pack("H*").unpack("C3")) if value.is_a?(String) && value =~ /\A#\h{6}\z/
 
-          value.is_a?(Symbol) ? Palette.live.named(value) : nil
+          value.is_a?(String) && value =~ /\A#\h{6}\z/ ? Color.new(*[value[1, 6]].pack("H*").unpack("C3")) : nil
         end
 
         # Lets go of every part and row noted, as F12 starts the game again.

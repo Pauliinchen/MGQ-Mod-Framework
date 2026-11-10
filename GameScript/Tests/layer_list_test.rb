@@ -3,6 +3,7 @@
 #
 #  Changelog:
 #      Paulinchen  2026-11-10: Covered a step of a dim arrow, which tells on_refuse the herb and the step
+#                            - Covered a heading in a color given as [r, g, b] and a row that names no color
 #      Paulinchen  2026-11-09: Covered a filter that keeps some rows, a pick among them and the row that says none is left
 #      Paulinchen  2026-11-07: Dropped cancel_to:, which the cancel rule replaces
 #      Paulinchen  2026-11-06: Covered a pick that goes on into the slots, from where cancel comes back to the bag
@@ -20,6 +21,16 @@
 
 require_relative "layer_support"
 require_relative "equip_support"
+
+# A picture that also notes the color each text was last drawn in.
+class Bitmap
+  # Notes a text drawn with its place and its color.
+  def draw_text(x, y, width, _height, text, align = 0)
+    @texts << [landing(x, width, text, align), y, text]
+    $colors[text] = @font.color.to_a.map { |value| value.to_i }
+  end
+end
+$colors = {}
 
 BAG_ROWS = <<-RUBY
   module Camp_Rows
@@ -143,7 +154,8 @@ end
 
 # The party's members with their place as a label and their level as a note: the labels' column as
 # wide as the widest label of all members, also while a search hides that member; the notes after
-# the widest name note_at: gives, and label_width: given as texts.
+# the widest name note_at: gives, and label_width: given as texts; last, races under a heading in a
+# color given as [r, g, b], and a row whose color is misspelt.
 in_game_folder do
   tree = FakeTree.new
   boot_tree(tree_dll(tree)) do
@@ -196,5 +208,31 @@ in_game_folder do
     party.label_width = ["Reserve member"]
     lefts = draw.call
     check("label_width: given as texts sets the labels' column", lefts["Luka"] - lefts["Leader"], widest.call(["Reserve member"]) + gap)
+
+    load_mod("Patch/Race_Rows.rb", <<-RUBY)
+      module Race_Rows
+        UI = Mod_Framework::UI
+
+        class Races < UI::Component
+          def render
+            window "Peoples" do
+              list [{ heading: "Races", color: [110, 160, 230] }, "Elf", { text: "Vampire", color: :primery }], id: :races, bind_index: :picked
+            end
+          end
+        end
+      end
+    RUBY
+    frame
+    ui.open(Race_Rows::Races)
+    frame
+    races = ui::Engine::Tree.roots.last.find(:races)
+    tree.rects[races.node] = [0, 0, 400, 72]
+    races.placed([0, 0, 400, 72])
+    frame
+    Graphics.update
+    check("a heading in a color given as [r, g, b] draws in it", $colors["Races"], [110, 160, 230, 255])
+    check("a row that names no color logs the list and draws in the text color",
+          [$logged.grep(/names the color/), $colors["Vampire"]],
+          [["components: List races names the color :primery, which is no color name; did you mean :primary? It draws in the text color."], $colors["Elf"]])
   end
 end

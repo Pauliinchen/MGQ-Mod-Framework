@@ -3,6 +3,7 @@
 #
 #  Changelog:
 #      Paulinchen  2026-11-10: Told refuse with the step of a dim arrow Left or Right pressed
+#                            - Named the list in the log by its class and id again instead of its describe option
 #      Paulinchen  2026-11-09: Kept a table cell's avatar picture scaled at any factor with the list
 #                            - Scaled a table cell's avatar picture at any factor with scale: :auto
 #                            - Drew a table cell's avatar face in its hue
@@ -255,6 +256,10 @@ module Mod_Framework
         options :rows, :rows_shown, :label_width, :index, :follow_pointer, :shoulder_pages, :filter, :only, :no_match_text, :empty_text, :note_at, :submit_to,
                 :most_rows, :keep_cursor, :columns, :cell_gap, :reorder, :move_hotkeys, :leave_ends, :sides, :quiet, :row_height, :leave_sides, :describe, :escapes, :round,
                 :cells, :click_picks, :share_room, :pages_beside, :highlight
+
+        # The option :describe keeps only its setter, as its reader would hide Component#describe,
+        # which names the list in the log.
+        remove_method :describe
 
         # Makes a list, its cursor on one of its rows or on none.
         #

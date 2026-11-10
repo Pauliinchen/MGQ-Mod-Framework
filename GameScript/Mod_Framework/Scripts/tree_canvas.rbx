@@ -2,6 +2,7 @@
 #  tree_canvas.rbx
 #
 #  Changelog:
+#      Paulinchen  2026-11-10: Drew a color given as [r, g, b] or "#RRGGBB" wherever a color name is taken
 #      Paulinchen  2026-11-09: Drew a gauge's outer edge in a color of its own, or in a shade of its fill, with :border
 #                            - Drew a part's border in a color, a shade or the theme's frame at any width, along a box or a pill
 #                            - Filled a part's background in a color or the theme's back, thinning to nothing toward a side with a fade
@@ -768,15 +769,15 @@ module Mod_Framework
           Style.draw_scrollbar(@bitmap, @left + x, @top + y, height, first, shown, total, @palette)
         end
 
-        # Finds a color: a Color as it is, a game text color by its index, or a color name of the
-        # theme the component draws in (Palette#named): a text color (:text, :dim, :success, :warning,
-        # :error, :gold, :own, and the old :good, :warn and :bad), a box color (:back, :heading,
-        # :edge, :picked and the others of Palette::ROLES), a palette role such as :primary (:system
-        # for :heading without the DLL) or a color name a mod added; of an animated color name its
-        # color at the component's left now. While the component takes no input, the color greyed
-        # out (GreyedPalette).
+        # Finds a color: a Color as it is, [r, g, b(, a)] or "#RRGGBB" as that color, a game text
+        # color by its index, or a color name of the theme the component draws in (Palette#named): a
+        # text color (:text, :dim, :success, :warning, :error, :gold, :own, and the old :good, :warn
+        # and :bad), a box color (:back, :heading, :edge, :picked and the others of Palette::ROLES),
+        # a palette role such as :primary (:system for :heading without the DLL) or a color name a
+        # mod added; of an animated color name its color at the component's left now. While the
+        # component takes no input, the color greyed out (GreyedPalette).
         #
-        # @param value [Color, Integer, Symbol, String, nil] The color, nil for the plain text color.
+        # @param value [Color, Array, Integer, Symbol, String, nil] The color, nil for the plain text color.
         # @return [Color] The color.
         def color(value)
           @palette.drawn(plain_color(value))
@@ -792,7 +793,7 @@ module Mod_Framework
         # Finds the color a text draws in: as color finds it, and while the component takes no input
         # greyed out and kept readable on the window (GreyedPalette#drawn_text).
         #
-        # @param value [Color, Integer, Symbol, nil] The color, nil for the plain text color.
+        # @param value [Color, Array, Integer, Symbol, String, nil] The color, nil for the plain text color.
         # @return [Color] The color.
         def text_color(value)
           @palette.drawn_text(plain_color(value || :text))
@@ -840,10 +841,12 @@ module Mod_Framework
         # Finds a color as color does, in the theme's own colors; :system in the look of the game's
         # own windows is the color they draw their labels in.
         #
-        # @param value [Color, Integer, Symbol, Lifted, nil] The color, nil for the plain text color.
+        # @param value [Color, Array, String, Integer, Symbol, Lifted, nil] The color, a color given by
+        #   its values (Colors.given), nil for the plain text color.
         # @return [Color] The color.
         def plain_color(value)
-          return value if value.is_a?(Color)
+          given = Colors.given(value)
+          return given if given
           return plain_color(value.name) if value.is_a?(Lifted)
           return UI.text_color(value) if value.is_a?(Integer)
           return Style::TEXT if value.to_s.empty?
