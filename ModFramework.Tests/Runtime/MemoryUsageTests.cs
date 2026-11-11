@@ -2,6 +2,7 @@
 //  MemoryUsageTests.cs
 //
 //  Changelog:
+//      Paulinchen  2026-11-10: Checked that the memory status reads the address space as the walk over its regions does
 //      Paulinchen  2026-11-09: Checked that a trim that freed little doubles the gap until the free space is back at the floor
 //                            - Created
 //
@@ -46,5 +47,20 @@ public sealed class MemoryUsageTests
 
         Assert.Equal([1750, 299, 1100], new[] { "used", "free", "private" }.Select(key => answer[key].AsInt()));
         Assert.True(MemoryTopics.Check(null, guard, 0).IsNil);
+    }
+
+    /// <summary>
+    /// Asserts that the system's memory status reads the address space used and free as the walk
+    /// over its regions does, within what the test host allocates meanwhile.
+    /// </summary>
+    [Fact]
+    public void Status_MatchesTheWalk()
+    {
+        const ulong Slack = 16 * 1024 * 1024;
+        var walked = MemoryUsage.Walk()!.Value;
+        var status = MemoryUsage.Status()!.Value;
+
+        Assert.InRange(status.Free, walked.Free - Slack, walked.Free + Slack);
+        Assert.InRange(status.Used + status.Free, walked.Used + walked.Free - Slack, walked.Used + walked.Free + Slack);
     }
 }

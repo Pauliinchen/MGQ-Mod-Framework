@@ -2,6 +2,7 @@
 //  MemoryUsage.cs
 //
 //  Changelog:
+//      Paulinchen  2026-11-10: Read the address space from the system's memory status on Windows instead of walking its regions
 //      Paulinchen  2026-11-09: Waited longer between trims that free little, and logged how long the first read took
 //                            - Created
 //
@@ -44,13 +45,13 @@ public static unsafe partial class MemoryUsage
     private const ulong LowestAddress = 0x10000;
 
     /// <summary>
-    /// 1 once the time of a walk over the address space was logged.
+    /// 1 once the time of the first reading of the address space was logged.
     /// </summary>
     private static int _walkTimed;
 
     /// <summary>
-    /// Reads the game's memory now, which walks every region of its address space, a few
-    /// milliseconds.
+    /// Reads the game's memory now: on Windows from the system's memory status, in microseconds;
+    /// under Wine by walking every region of its address space, a few milliseconds (see <see cref="Walk"/>).
     /// </summary>
     /// <returns>The reading; <see langword="null"/> on JoiPlay or when the system cannot tell.</returns>
     public static MemoryReading? Read()
@@ -64,7 +65,7 @@ public static unsafe partial class MemoryUsage
         {
             var started = Stopwatch.GetTimestamp();
 
-            if (Walk() is not { } space)
+            if ((Platforms.Current == GamePlatform.Wine ? Walk() : Status()) is not { } space)
             {
                 return null;
             }
@@ -86,10 +87,22 @@ public static unsafe partial class MemoryUsage
     }
 
     /// <summary>
+    /// Reads the address space used and free from the system's memory status, which on Windows sums
+    /// the same regions <see cref="Walk"/> does.
+    /// </summary>
+    /// <returns>The bytes used and free; <see langword="null"/> when the system cannot tell.</returns>
+    internal static (ulong Used, ulong Free)? Status()
+    {
+        var status = new MemoryStatus { Length = (uint)sizeof(MemoryStatus) };
+        return GlobalMemoryStatusEx(&status) ? (status.TotalVirtual - status.AvailVirtual, status.AvailVirtual) : null;
+    }
+
+    /// <summary>
     /// Sums the regions of the address space that are free and those that are not.
     /// </summary>
+    /// <remarks>Wine's memory status tells the free address space from the working set, far above what is free.</remarks>
     /// <returns>The bytes used and free; <see langword="null"/> when no region could be read.</returns>
-    private static (ulong Used, ulong Free)? Walk()
+    internal static (ulong Used, ulong Free)? Walk()
     {
         var info = new MemoryBasicInformation();
         var size = (nuint)sizeof(MemoryBasicInformation);
@@ -125,6 +138,15 @@ public static unsafe partial class MemoryUsage
     }
 
     /// <summary>
+    /// Reads the system's memory status, with the calling process's address space.
+    /// </summary>
+    /// <param name="status">Receives the status; its length set first.</param>
+    /// <returns><see langword="true"/> when it was read.</returns>
+    [LibraryImport("kernel32.dll")]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static partial bool GlobalMemoryStatusEx(MemoryStatus* status);
+
+    /// <summary>
     /// Reads the memory counters of a process.
     /// </summary>
     /// <param name="process">The process.</param>
@@ -144,6 +166,40 @@ public static unsafe partial class MemoryUsage
     /// <returns>The bytes written into <paramref name="info"/>, 0 past the last region.</returns>
     [LibraryImport("kernel32.dll")]
     private static partial nuint VirtualQuery(nuint address, MemoryBasicInformation* info, nuint length);
+
+    /// <summary>
+    /// MEMORYSTATUSEX: the system's memory and the calling process's address space.
+    /// </summary>
+    [StructLayout(LayoutKind.Sequential)]
+    private struct MemoryStatus
+    {
+        /// <summary>The structure's size in bytes.</summary>
+        public uint Length;
+
+        /// <summary>The share of physical memory in use, in percent.</summary>
+        public uint MemoryLoad;
+
+        /// <summary>The physical memory.</summary>
+        public ulong TotalPhys;
+
+        /// <summary>The physical memory free.</summary>
+        public ulong AvailPhys;
+
+        /// <summary>The commit limit.</summary>
+        public ulong TotalPageFile;
+
+        /// <summary>The memory that may still be committed.</summary>
+        public ulong AvailPageFile;
+
+        /// <summary>The process's user address space.</summary>
+        public ulong TotalVirtual;
+
+        /// <summary>The process's user address space neither reserved nor committed.</summary>
+        public ulong AvailVirtual;
+
+        /// <summary>Unused, always 0.</summary>
+        public ulong AvailExtendedVirtual;
+    }
 
     /// <summary>
     /// PROCESS_MEMORY_COUNTERS_EX: a process's memory.

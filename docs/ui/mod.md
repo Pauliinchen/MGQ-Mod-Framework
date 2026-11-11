@@ -187,9 +187,10 @@ set on its page of the website. Tell your players there that it needs the Mod Fr
 - `Mod_Framework.memory` reads the game's memory now: `"used"` and `"free"` address space and
   `"private"`, the memory the game holds for itself, all three in megabytes; nil without the DLL
   and on JoiPlay. The game is a 32-bit program and ends without a word once a picture finds no
-  room, so a mod that makes large pictures can log this at a screen change. A reading takes a few
-  milliseconds; read it at most every few seconds. The framework itself collects and lets go of
-  pictures while less than 300 MB is free.
+  room, so a mod that makes large pictures can log this at a screen change. It reads the system's
+  memory status on Windows and walks the address space under Wine, so read it at most every few
+  seconds or at a screen change. The framework itself collects and lets go of pictures while less
+  than 300 MB is free.
 
 ## Rules for game scripts
 

@@ -134,8 +134,8 @@ module Mod_Framework
   # The topic that reads the game's memory, MemoryTopics.ReadTopic in C#.
   MEMORY_TOPIC = "memory.read"
 
-  # Reads the game's memory now, which takes a few milliseconds, so a mod reads it at most every
-  # few seconds, such as at a screen change.
+  # Reads the game's memory now: from the system's memory status on Windows, by walking the address
+  # space under Wine, so a mod reads it at most every few seconds or at a screen change.
   #
   # @return [Hash{String => Integer}, nil] The megabytes of address space "used" and "free", and the
   #   "private" bytes; nil without the DLL and on JoiPlay.
