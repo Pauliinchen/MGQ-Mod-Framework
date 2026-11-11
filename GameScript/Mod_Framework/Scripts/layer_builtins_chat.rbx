@@ -3,6 +3,7 @@
 #
 #  Changelog:
 #      Paulinchen  2026-11-11: Told a taken item of menu to on_submit in place of on_pick
+#                            - Stopped giving a log most_rows, which it no longer takes
 #      Paulinchen  2026-11-06: Opened the items of menu as the menus of UI.menu, dialogs of the UI layer
 #      Paulinchen  2026-11-05: Stopped the typing of a field in a log's window as a name in the log is clicked
 #                            - Added menu, a button that opens a menu of items, sub-menus of items within them
@@ -18,7 +19,7 @@ module Mod_Framework
       # the tool writing docs/ui reads it too.
       module Builtins
         # Turns a log's params into the engine's options: a copy of its rows, so rows a mod adds to
-        # the same Array still count as a change, all of them kept, and with rows_shown: :fill the
+        # the same Array still count as a change, and with rows_shown: :fill the
         # room its stack leaves.
         #
         # @param params [Hash] The params, live values read.
@@ -26,7 +27,7 @@ module Mod_Framework
         def self.log(params)
           shown = params[:rows_shown] || :fill
           options = common(params).merge(:rows => Array(params[:rows]).dup, :rows_shown => shown, :keep_place => params[:keep_place] != false,
-                                         :wheel_rows => params[:wheel_rows] || 3, :scrollbar => params[:scrollbar] != false, :most_rows => nil)
+                                         :wheel_rows => params[:wheel_rows] || 3, :scrollbar => params[:scrollbar] != false)
           options[:grow] ||= 1 if shown == :fill
           options
         end

@@ -2,6 +2,7 @@
 //  TextLayoutTests.cs
 //
 //  Changelog:
+//      Paulinchen  2026-11-11: Checked the rows of a log laid out through its topic
 //      Paulinchen  2026-11-07: Wrote the cases of cutting and breaking a text in the tests instead of reading a fixture
 //                            - Used the bridge and the runtime under the framework's namespace
 //      Paulinchen  2026-11-05: Checked a color code that names a color
@@ -154,6 +155,40 @@ public sealed class TextLayoutTests
         Assert.Equal([(UiText.WantedTopic, (RubyValue)new RubyHash { { "key", 1 }, { "points", new RubyArray { (long)'本' } } })], events);
         Assert.Empty(ui.Drain());
         Assert.Equal(new RubyArray { new RubyArray { 0, 3 }, new RubyArray { 3, 4 }, new RubyArray { 7, 1 } }, cells);
+    }
+
+    /// <summary>
+    /// Asserts that the log topic lays out chat rows as a text box breaks its text: a name and its
+    /// colon stay together across their parts, a line goes on in the part it broke in at x 0, and a
+    /// word longer than the width starts a line of its own and breaks inside.
+    /// </summary>
+    [Fact]
+    public void LogTopic_LaysOutRowsOfPartsAsATextBoxBreaksItsText()
+    {
+        var ui = new UiContext();
+        _ = new UiText(new UiHost(ui.Context));
+        var widths = new RubyHash();
+        for (int point = 32; point < 127; point++)
+        {
+            widths.Add((long)point, 10);
+        }
+
+        ui.Value(UiText.GlyphsTopic, new RubyHash { { "key", 1 }, { "name", "VL Gothic" }, { "size", 16 }, { "bold", false }, { "widths", widths } });
+        var rows = new RubyArray { new RubyArray { "Ana", ": wait at the inn" }, new RubyArray { "Mia", ": Supercalifragilistic" } };
+        RubyValue lines = ui.Value(UiText.LogTopic, new RubyArray { 1, 100, rows, RubyNil.Value });
+
+        var ana = new RubyArray
+        {
+            new RubyArray { new RubyArray { 0, 0, "Ana", 30 }, new RubyArray { 30, 1, ": wait ", 70 } },
+            new RubyArray { new RubyArray { 0, 1, "at the inn", 100 } },
+        };
+        var mia = new RubyArray
+        {
+            new RubyArray { new RubyArray { 0, 0, "Mia", 30 }, new RubyArray { 30, 1, ": ", 20 } },
+            new RubyArray { new RubyArray { 0, 1, "Supercalif", 100 } },
+            new RubyArray { new RubyArray { 0, 1, "ragilistic", 100 } },
+        };
+        Assert.Equal(new RubyArray { ana, mia }, lines);
     }
 
     /// <summary>

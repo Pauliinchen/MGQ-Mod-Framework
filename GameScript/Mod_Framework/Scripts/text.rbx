@@ -2,6 +2,7 @@
 #  text.rbx
 #
 #  Changelog:
+#      Paulinchen  2026-11-11: Named the topic that lays out the rows of a log
 #      Paulinchen  2026-11-09: Read a width given as pixels or as texts of which the widest sets it
 #      Paulinchen  2026-11-07: Found where a part occurs in a text through C#
 #                            - Added the rule by which a typed text matches a word, worked out in C#
@@ -259,8 +260,8 @@ module Mod_Framework
       # A font measures printable ASCII as it is first used and checks that a few sample texts
       # measure as the sum of their characters; one that fails, such as an italic font or one with
       # kerning that a translation or another mod sets, is cut and broken here, as is every font while
-      # the bridge is closed; a text box and a text with escape codes are laid out in C# by it all the
-      # same, a pixel or two off.
+      # the bridge is closed; a text box, a text with escape codes and a log are laid out in C# by it
+      # all the same, a pixel or two off.
       module Glyphs
         # Defines a font in C#, or adds characters to one, UiText.GlyphsTopic.
         TOPIC = "ui.glyphs"
@@ -276,6 +277,9 @@ module Mod_Framework
 
         # Lays out a text with the game's escape codes, UiText.RunsTopic.
         RUNS = "ui.text.runs"
+
+        # Lays out the rows of a log, UiText.LogTopic.
+        LOG = "ui.text.log"
 
         # The event of characters a model met that its font never measured, UiText.WantedTopic.
         WANTED = "ui.glyphs.wanted"
@@ -317,7 +321,7 @@ module Mod_Framework
         # Asks C# to lay out a text in the font a measure draws in, handing over the widths of the
         # characters C# lacks.
         #
-        # @param topic [String] CUT, WRAP, SPANS or RUNS.
+        # @param topic [String] CUT, WRAP, SPANS, RUNS or LOG.
         # @param measure [Bitmap, Window_Base, nil] What measures with the font, nil for the font of cells.
         # @param text [String] Every character the layout measures.
         # @param inexact [Boolean] Whether a font that failed the sum check is laid out in C# all the same.

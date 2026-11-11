@@ -2,6 +2,7 @@
 #  layer_log_test.rb
 #
 #  Changelog:
+#      Paulinchen  2026-11-11: Moved the check of a word without room for its outline to the in-game suite, where the DLL lays the log out
 #      Paulinchen  2026-11-07: Placed the parts a test places inside the content of their root, which draws only there
 #      Paulinchen  2026-11-06: Checked that a word without room for its outline goes onto the next line
 #      Paulinchen  2026-11-05: Created
@@ -11,8 +12,7 @@
 # Covers log of the UI layer (design v2 section 5.5) in a booted game against FakeTree, through a
 # mod's camp talk: a log of the mod's own Array of lines, which grows as the mod adds lines to it; a
 # line field that steers the log, whose Page Up scrolls it up, where a new line keeps the view still
-# until the mod scrolls it back to the newest; a word without room for its outline wrapped onto the
-# next line; and a name the pointer lights and a click on it tells the mod about.
+# until the mod scrolls it back to the newest; and a name the pointer lights and a click on it tells the mod about.
 
 require_relative "layer_support"
 
@@ -81,15 +81,6 @@ in_game_folder do
     talk.part(:camp_log).scroll_to_end
     frame
     check("the bottom line after scroll_to_end", bottom.call, "Mia: five")
-
-    # A log as wide as a line's words without the room their outline takes puts the last word on
-    # the next line instead of drawing it narrower.
-    words = ui.text_width(ui.font_bitmap(ui.font_px(:small)), "Mia: in")
-    tree.rects[log.node] = [root.content_rect.x, root.content_rect.y, words + 1 + ui::Engine::Style::SCROLLBAR_WIDTH + ui::Engine::LogView::BAR_GAP, 2 * line]
-    $camp_lines << "Mia: in"
-    5.times { frame }
-    check("the bottom line once a word lacks the room of its outline", bottom.call, "in")
-    tree.rects[log.node] = [root.content_rect.x, root.content_rect.y, 200, 2 * line]
 
     # The pointer on Ana's name lights it, and a click on it tells the mod whose name it is.
     $camp_lines.replace([[ana, ": wait"]])

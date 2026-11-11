@@ -2,6 +2,8 @@
 #  log_view.rbx
 #
 #  Changelog:
+#      Paulinchen  2026-11-11: Laid out all its rows in one call to C# by the rule of a text box, one layout kept per width
+#                            - Removed add, the oldest rows dropping past most_rows and the word wrap of its own
 #      Paulinchen  2026-11-07: Removed add_log of the old API
 #      Paulinchen  2026-11-06: Wrapped a word whose outline would not fit the line instead of drawing it narrower
 #                            - Called the engine's classes by their names under UI::Engine
@@ -23,8 +25,7 @@ module Mod_Framework
       # new rows come in scrolled up. The wheel scrolls it :wheel_rows lines a notch, its scrollbar
       # shows while lines are hidden, a part with :data draws lighter under the pointer and a click
       # on it tells click. A text field's steer(log) scrolls it by Up, Down, Page Up and Page Down.
-      # add(row) (or <<) puts one row at the bottom, wrapping only that row; past :most_rows the oldest
-      # rows go. rows= sets them all anew.
+      # rows= sets its rows anew, which C# lays out in lines by the rule of a text box.
       #
       # Events: click (row, part).
       class LogView < Component
@@ -37,16 +38,11 @@ module Mod_Framework
         # How much lighter a part with :data draws under the pointer.
         LIGHTER = 0.4
 
-        # The rows a log keeps unless it says otherwise.
-        MOST_ROWS = 200
-
-        # Tells the defaults of the options: no rows, filling its room, holding still scrolled up,
-        # keeping the newest MOST_ROWS rows.
+        # Tells the defaults of the options: no rows, filling its room, holding still scrolled up.
         #
         # @return [Hash] The defaults.
         def self.defaults
-          super.merge(:rows => [], :rows_shown => :fill, :keep_place => true, :wheel_rows => 3, :scrollbar => true, :font_size => :small, :color => nil,
-                      :most_rows => MOST_ROWS)
+          super.merge(:rows => [], :rows_shown => :fill, :keep_place => true, :wheel_rows => 3, :scrollbar => true, :font_size => :small, :color => nil)
         end
 
         # Tells which properties of C#'s tree each option sets.
@@ -56,7 +52,7 @@ module Mod_Framework
           super.merge(:rows_shown => ["measured"], :font_size => ["measured"])
         end
 
-        options :rows_shown, :keep_place, :wheel_rows, :scrollbar, :font_size, :color, :most_rows
+        options :rows_shown, :keep_place, :wheel_rows, :scrollbar, :font_size, :color
 
         # Makes a log, scrolled to its newest row.
         #
@@ -64,10 +60,8 @@ module Mod_Framework
         def initialize(options = {})
           super
           @offset = 0
-          @lines = nil
-          @counts = []
+          @layouts = {}
           @options[:rows] = Array(@options[:rows]).dup
-          drop_oldest
         end
 
         # Tells its rows.
@@ -77,37 +71,17 @@ module Mod_Framework
           @options[:rows]
         end
 
-        # Sets all its rows anew, the newest :most_rows kept; scrolled up with :keep_place, the view
-        # holds still while new rows come in.
+        # Sets all its rows anew; scrolled up with :keep_place, the view holds still while new rows
+        # come in.
         #
         # @param value [Array] The rows.
         def rows=(value)
-          before = @lines ? @lines[1].size : nil
+          before = drawn_lines && drawn_lines.size
           @options[:rows] = Array(value).dup
-          @lines = nil
-          drop_oldest
+          @layouts = {}
           @grow_from = before if @offset > 0 && @options[:keep_place]
           redraw
         end
-
-        # Puts one row at the bottom, wrapping only that row, and lets the oldest rows past
-        # :most_rows go; scrolled up with :keep_place, the view holds still.
-        #
-        # @param row [String, Array, Hash] The row, as rows= takes them.
-        # @return [LogView] Itself.
-        def add(row)
-          @options[:rows] << row
-          if @lines
-            added = row_lines(UI.font_bitmap(UI.font_px(@options[:font_size])), row, [@lines[0], 1].max)
-            @lines[1].concat(added)
-            @counts << added.size
-            @offset += added.size if @offset > 0 && @options[:keep_place]
-          end
-          drop_oldest
-          redraw
-          self
-        end
-        alias_method :<<, :add
 
         # Scrolls to its newest row.
         #
@@ -124,7 +98,7 @@ module Mod_Framework
         # @return [LogView] Itself.
         def scroll_by(lines)
           @offset = [@offset + lines.to_i, 0].max
-          @offset = [@offset, hidden_lines].min if @lines
+          @offset = [@offset, hidden_lines].min if drawn_lines
           redraw
           self
         end
@@ -195,6 +169,7 @@ module Mod_Framework
           shown = shown_lines(canvas.height - top - bottom)
           width = canvas.width - left - right - (bar?(shown, canvas.width - left - right) ? Style::SCROLLBAR_WIDTH + BAR_GAP : 0)
           lines = lines_for(width)
+          @drawn_width = width
           settle_offset(lines.size, shown)
           first = [lines.size - shown - @offset, 0].max
           visible = lines[first, shown] || []
@@ -202,10 +177,10 @@ module Mod_Framework
           size = UI.font_px(@options[:font_size])
           @drawn = []
           visible.each do |line|
-            line[:segments].each do |x, text, color, part|
+            line[:segments].each do |x, text, color, part, wide|
               look = part.equal?(@hover_part) ? lighter(canvas.color(color)) : color
               canvas.text(left + x, y, width - x, line_height, text, :size => size, :color => look, :opacity => line[:opacity])
-              @drawn << [left + x, y, canvas.text_width(text, size), line[:row], part]
+              @drawn << [left + x, y, wide, line[:row], part]
             end
             y += line_height
           end
@@ -213,25 +188,6 @@ module Mod_Framework
         end
 
         private
-
-        # Follows a changed option: fewer :most_rows lets the oldest rows go at once.
-        #
-        # @param name [Symbol] The option.
-        def changed(name)
-          super
-          drop_oldest if name == :most_rows
-        end
-
-        # Lets the oldest rows past :most_rows go, with their lines.
-        def drop_oldest
-          most = @options[:most_rows]
-          rows = @options[:rows]
-          return unless most && rows.size > most.to_i
-
-          gone = rows.size - [most.to_i, 0].max
-          rows.shift(gone)
-          @lines[1].shift(@counts.shift(gone).inject(0) { |sum, count| sum + count }) if @lines
-        end
 
         # Tells the height of a line in its font.
         #
@@ -253,7 +209,7 @@ module Mod_Framework
         #
         # @return [Integer] The lines.
         def hidden_lines
-          [Array(@lines && @lines[1]).size - shown_lines, 0].max
+          [Array(drawn_lines).size - shown_lines, 0].max
         end
 
         # Tells whether it draws its scrollbar: with :scrollbar while lines are hidden.
@@ -278,52 +234,80 @@ module Mod_Framework
           @offset = UI.within(@offset, 0, [count - shown, 0].max)
         end
 
-        # Lays its rows out in lines of a width, once per width and rows.
+        # Tells the lines it drew last, nil before it drew.
         #
-        # @param width [Integer] The width.
-        # @return [Array<Hash>] Each line's :row, :opacity and :segments ([x, text, color, part]).
-        def lines_for(width)
-          return @lines[1] if @lines && @lines[0] == width
-
-          bitmap = UI.font_bitmap(UI.font_px(@options[:font_size]))
-          lines = []
-          @counts = []
-          Array(@options[:rows]).each do |row|
-            laid = row_lines(bitmap, row, [width, 1].max)
-            @counts << laid.size
-            lines.concat(laid)
-          end
-          @lines = [width, lines]
-          lines
+        # @return [Array<Hash>, nil] The lines, see lines_for.
+        def drawn_lines
+          @drawn_width && @layouts[@drawn_width]
         end
 
-        # Lays one row out in lines: its parts' words side by side, a new line where the next word
-        # does not fit with the room its outline takes, a word longer than the width broken inside.
+        # Lays its rows out in lines of a width, each width once until its rows change, so the
+        # scrollbar's check at the whole width and the lines beside the scrollbar both stay.
         #
-        # @param bitmap [Bitmap] What measures in its font.
-        # @param row [String, Array, Hash] The row.
         # @param width [Integer] The width.
-        # @return [Array<Hash>] The row's lines.
-        def row_lines(bitmap, row, width)
-          opacity = row.is_a?(Hash) ? row[:opacity] : nil
-          parts = row.is_a?(Hash) ? Array(row[:parts]) : (row.is_a?(Array) ? row : [row.to_s])
-          lines = [{ :row => row, :opacity => opacity, :segments => [] }]
-          x = 0
-          parts.each do |part|
-            entry = part.is_a?(Hash) ? part : { :text => part.to_s }
-            color = drawn_color(entry[:color] || @options[:color])
-            entry[:text].to_s.scan(/\S+\s*|\s+/).each do |word|
-              pieces(bitmap, word, width).each do |piece|
-                if x > 0 && x + UI.text_width(bitmap, piece.rstrip) + Canvas::OUTLINE_ROOM > width
-                  lines << { :row => row, :opacity => opacity, :segments => [] }
-                  x = 0
-                end
-                lines.last[:segments] << [x, piece, color, part]
-                x += UI.text_width(bitmap, piece)
+        # @return [Array<Hash>] Each line's :row, :opacity and :segments ([x, text, color, part, width]).
+        def lines_for(width)
+          @layouts[width] ||= laid_out(width)
+        end
+
+        # Lays its rows out in lines of a width in C#, a new line where a word does not fit with the
+        # room its outline takes; when C# cannot, each row is one line without wrapping.
+        #
+        # @param width [Integer] The width.
+        # @return [Array<Hash>] The lines, see lines_for.
+        def laid_out(width)
+          rows = Array(@options[:rows])
+          parts = rows.map { |row| parts_of(row) }
+          texts = parts.map { |each| each.map { |part| text_of(part) } }
+          bitmap = UI.font_bitmap(UI.font_px(@options[:font_size]))
+          laid = Glyphs.ask(Glyphs::LOG, bitmap, texts.flatten.join, true) { |key| [key, [width - Canvas::OUTLINE_ROOM, 1].max, texts] }
+          laid = unwrapped(bitmap, texts) unless laid.is_a?(Array) && laid.size == rows.size
+          lines = []
+          rows.each_with_index do |row, place|
+            opacity = row.is_a?(Hash) ? row[:opacity] : nil
+            laid[place].each do |pieces|
+              segments = pieces.map do |x, at, text, wide|
+                part = parts[place][at]
+                [x, text, drawn_color((part.is_a?(Hash) ? part[:color] : nil) || @options[:color]), part, wide]
               end
+              lines << { :row => row, :opacity => opacity, :segments => segments }
             end
           end
           lines
+        end
+
+        # Lays rows out as one line each, their parts side by side, for when C# cannot lay them out,
+        # which it logs once while the DLL runs.
+        #
+        # @param bitmap [Bitmap] What measures in its font.
+        # @param texts [Array<Array<String>>] Each row's parts' texts.
+        # @return [Array] Per row its one line of [x, part, text, width].
+        def unwrapped(bitmap, texts)
+          Tree.log_once([:log_unwrapped], "a log showed its rows without wrapping them, since the DLL did not lay them out") if Mod_Framework.available?
+          texts.map do |row|
+            x = 0
+            [row.each_with_index.map do |text, at|
+              wide = UI.text_width(bitmap, text)
+              x += wide
+              [x - wide, at, text, wide]
+            end]
+          end
+        end
+
+        # Tells a row's parts.
+        #
+        # @param row [String, Array, Hash] The row.
+        # @return [Array] Its parts as given.
+        def parts_of(row)
+          row.is_a?(Hash) ? Array(row[:parts]) : (row.is_a?(Array) ? row : [row.to_s])
+        end
+
+        # Tells a part's text.
+        #
+        # @param part [Hash, String] The part.
+        # @return [String] Its text.
+        def text_of(part)
+          (part.is_a?(Hash) ? part[:text] : part).to_s
         end
 
         # Tells the color a part draws in: a color name stays a name, which the canvas finds in the
@@ -336,23 +320,6 @@ module Mod_Framework
           when Array then Color.new(*value)
           when /\A#(\h\h)(\h\h)(\h\h)\z/ then Color.new($1.to_i(16), $2.to_i(16), $3.to_i(16))
           else value
-          end
-        end
-
-        # Breaks a word longer than a width into pieces that fit it with the room their outline
-        # takes, character by character.
-        #
-        # @param bitmap [Bitmap] What measures in its font.
-        # @param word [String] The word.
-        # @param width [Integer] The width.
-        # @return [Array<String>] The pieces, the word alone when it fits.
-        def pieces(bitmap, word, width)
-          return [word] if UI.text_width(bitmap, word.rstrip) + Canvas::OUTLINE_ROOM <= width
-
-          word.each_char.inject([""]) do |all, char|
-            all << "" if !all.last.empty? && UI.text_width(bitmap, all.last + char) + Canvas::OUTLINE_ROOM > width
-            all.last << char
-            all
           end
         end
 

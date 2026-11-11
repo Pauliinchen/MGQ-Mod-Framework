@@ -2,6 +2,7 @@
 //  UiText.cs
 //
 //  Changelog:
+//      Paulinchen  2026-11-11: Laid out the rows of a log in one call by the rule of a text box
 //      Paulinchen  2026-11-07: Used the bridge and the runtime under the framework's namespace
 //      Paulinchen  2026-11-04: Counted the character widths learned, so the tree lays its texts out again after new ones
 //      Paulinchen  2026-10-28: Moved into the Mod Framework
@@ -14,6 +15,7 @@
 using System;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using MGQParadox.ModFramework.Bridge;
 using MGQParadox.ModFramework.Bridge.Ruby;
 
@@ -52,6 +54,13 @@ public sealed class UiText
     /// text, new widths or nil], answering its lines (see <see cref="Escapes.Value"/>).
     /// </summary>
     public const string RunsTopic = "ui.text.runs";
+
+    /// <summary>
+    /// Lays out the rows of a log: [key, width, rows, each an Array of its parts' texts, new widths or
+    /// nil], answering per row its lines, each an Array of [x, part, text, width] (see
+    /// <see cref="TextLayout.Rows"/>).
+    /// </summary>
+    public const string LogTopic = "ui.text.log";
 
     /// <summary>
     /// The event that asks the scripts to measure characters a model met that no font of theirs
@@ -107,6 +116,18 @@ public sealed class UiText
             RubyArray args = request.AsArray();
             FontGlyphs glyphs = Learned(args, 3);
             return SpansValue(TextLayout.Spans(glyphs, args[2].AsText(), args[1].AsInt()));
+        });
+        context.Register(LogTopic, (_, request) =>
+        {
+            RubyArray args = request.AsArray();
+            FontGlyphs glyphs = Learned(args, 3);
+            var rows = new List<IReadOnlyList<string>>();
+            foreach (RubyValue row in args[2].AsArray())
+            {
+                rows.Add(row.AsArray().Select(part => part.AsText()).ToList());
+            }
+
+            return LogValue(TextLayout.Rows(glyphs, rows, args[1].AsInt()));
         });
         context.Register(RunsTopic, (_, request) =>
         {
@@ -173,6 +194,35 @@ public sealed class UiText
         foreach (TextSpan span in spans)
         {
             value.Add(new RubyArray { span.Start, span.Length });
+        }
+
+        return value;
+    }
+
+    /// <summary>
+    /// Writes the lines of a log's rows as the scripts read them.
+    /// </summary>
+    /// <param name="rows">Per row its lines, each its pieces.</param>
+    /// <returns>Per row its lines, each an Array of [x, part, text, width].</returns>
+    public static RubyArray LogValue(IEnumerable<List<List<RowSegment>>> rows)
+    {
+        ArgumentNullException.ThrowIfNull(rows);
+        var value = new RubyArray();
+        foreach (List<List<RowSegment>> lines in rows)
+        {
+            var row = new RubyArray();
+            foreach (List<RowSegment> line in lines)
+            {
+                var pieces = new RubyArray();
+                foreach (RowSegment segment in line)
+                {
+                    pieces.Add(new RubyArray { segment.X, segment.Part, segment.Text, segment.Width });
+                }
+
+                row.Add(pieces);
+            }
+
+            value.Add(row);
         }
 
         return value;

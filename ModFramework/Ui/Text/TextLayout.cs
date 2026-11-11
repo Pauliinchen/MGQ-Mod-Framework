@@ -2,6 +2,7 @@
 //  TextLayout.cs
 //
 //  Changelog:
+//      Paulinchen  2026-11-11: Laid out rows of parts in lines by the rule of a text box, cut at the parts' boundaries
 //      Paulinchen  2026-10-31: Started a new line at a line break of a wrapped text
 //      Paulinchen  2026-10-28: Moved into the Mod Framework
 //      Paulinchen  2026-10-23: Created
@@ -19,6 +20,16 @@ namespace MGQParadox.ModFramework.Ui.Text;
 /// <param name="Start">The first code point.</param>
 /// <param name="Length">How many code points.</param>
 public readonly record struct TextSpan(int Start, int Length);
+
+/// <summary>
+/// A piece of a line of a row of parts: where it starts, which part it belongs to, its text and its
+/// width.
+/// </summary>
+/// <param name="X">Its left edge in the line, in pixels.</param>
+/// <param name="Part">The place of its part among the row's parts, from 0.</param>
+/// <param name="Text">Its text.</param>
+/// <param name="Width">Its width in pixels.</param>
+public readonly record struct RowSegment(int X, int Part, string Text, int Width);
 
 /// <summary>
 /// Cutting and breaking texts to a width by their characters' widths, as text.rbx does with
@@ -220,6 +231,42 @@ public static class TextLayout
     }
 
     /// <summary>
+    /// Breaks rows of parts into lines that fit a width by <see cref="Spans(FontGlyphs, ReadOnlySpan{int}, int)"/>,
+    /// each row's parts read as one text, so a word that runs across parts stays together, and cuts
+    /// each line at the parts' boundaries.
+    /// </summary>
+    /// <param name="glyphs">The font.</param>
+    /// <param name="rows">Each row's parts' texts.</param>
+    /// <param name="width">The width in pixels.</param>
+    /// <returns>Per row its lines, each its pieces from the left; a row without text has one empty line.</returns>
+    public static List<List<List<RowSegment>>> Rows(FontGlyphs glyphs, IReadOnlyList<IReadOnlyList<string>> rows, int width)
+    {
+        ArgumentNullException.ThrowIfNull(rows);
+        var laid = new List<List<List<RowSegment>>>(rows.Count);
+        foreach (IReadOnlyList<string> parts in rows)
+        {
+            var points = new List<int>();
+            var starts = new List<int>(parts.Count);
+            foreach (string part in parts)
+            {
+                starts.Add(points.Count);
+                points.AddRange(CodePoints.Of(part));
+            }
+
+            int[] all = points.ToArray();
+            var lines = new List<List<RowSegment>>();
+            foreach (TextSpan span in Spans(glyphs, all, width))
+            {
+                lines.Add(Segments(glyphs, all, starts, span));
+            }
+
+            laid.Add(lines);
+        }
+
+        return laid;
+    }
+
+    /// <summary>
     /// Finds the line of <see cref="Spans(FontGlyphs, string, int)"/> a place in the text is on: the
     /// last one that starts at or before it.
     /// </summary>
@@ -238,5 +285,36 @@ public static class TextLayout
         }
 
         return 0;
+    }
+
+    /// <summary>
+    /// Cuts a line of a row at its parts' boundaries.
+    /// </summary>
+    /// <param name="glyphs">The font.</param>
+    /// <param name="points">The row's code points.</param>
+    /// <param name="starts">Each part's first code point.</param>
+    /// <param name="span">The line.</param>
+    /// <returns>The line's pieces from the left, none for an empty line.</returns>
+    private static List<RowSegment> Segments(FontGlyphs glyphs, int[] points, List<int> starts, TextSpan span)
+    {
+        var segments = new List<RowSegment>();
+        int end = span.Start + span.Length;
+        int x = 0;
+        for (int part = 0; part < starts.Count; part++)
+        {
+            int from = Math.Max(starts[part], span.Start);
+            int to = Math.Min(part + 1 < starts.Count ? starts[part + 1] : points.Length, end);
+            if (to <= from)
+            {
+                continue;
+            }
+
+            ReadOnlySpan<int> piece = points.AsSpan(from, to - from);
+            int pieceWidth = Width(glyphs, piece);
+            segments.Add(new RowSegment(x, part, CodePoints.Text(piece), pieceWidth));
+            x += pieceWidth;
+        }
+
+        return segments;
     }
 }
