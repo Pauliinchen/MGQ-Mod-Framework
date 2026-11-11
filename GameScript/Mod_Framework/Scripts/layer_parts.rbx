@@ -2,6 +2,7 @@
 #  layer_parts.rbx
 #
 #  Changelog:
+#      Paulinchen  2026-11-11: Told a match an autocomplete takes to on_complete with its place, as a text field tells a completion
 #      Paulinchen  2026-11-09: Put the parts of a header's title_after: right after its title
 #                            - Gave a chip of a chip set its icons:
 #                            - Handed a part the markup of the tooltips of its slots or lines
@@ -470,7 +471,7 @@ module Mod_Framework
         end
 
         # Hands what an autocomplete tells to its bound state and its handlers: a match taken tells
-        # on_select.
+        # on_complete with its place, as a text field tells a completion taken.
         #
         # @param part [Part] The autocomplete's part.
         def self.wire_autocomplete(part)
@@ -480,7 +481,7 @@ module Mod_Framework
             bound_changed(part, text)
           end
           engine.on(:submit) { |text| input_submitted(part, text) }
-          engine.on(:complete) { |text, _place| dispatch(part, :on_select, [text]) }
+          engine.on(:complete) { |text, place| dispatch(part, :on_complete, [text, place]) }
         end
 
         # Gives a text field the text its bound state holds, the completions it offers and the list

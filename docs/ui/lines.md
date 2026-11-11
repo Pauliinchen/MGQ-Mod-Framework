@@ -8,7 +8,7 @@
 tells how many more there are and names them as the pointer rests on it, such as an item's
 effects in a summary. Lines come alone or in groups, each group's label beside its first line, in
 one column or two. A line may have a small line under it (`detail:`), which shows while there is
-room. With `on_pick` the player walks the lines and picks one.
+room. With `on_submit` the player walks the lines and picks one.
 
 ## Examples
 
@@ -33,7 +33,7 @@ lines [{ label: "Items", lines: $game_party.items.map { |item| { item: item } } 
 
 <!-- example: lines-pick -->
 ```ruby
-lines UI::Game.members.map { |member| { text: member.name, detail: member.class.name } }, on_pick: ->(place) { toast UI::Game.members[place].name }
+lines UI::Game.members.map { |member| { text: member.name, detail: member.class.name } }, on_submit: ->(place) { toast UI::Game.members[place].name }
 ```
 ![A line per member with their job under it](images/lines-pick.png)
 
@@ -78,18 +78,18 @@ Written `lines lines, ...`.
 
 | Event | Tells |
 |---|---|
-| `on_pick` | the line picked, from 0 among all of them; with on_pick: each line takes the keys |
+| `on_submit` | the line picked, from 0 among all of them; with on_submit: each line takes the keys |
 | `on_more` | the last line, which tells how many more lines there are, was clicked: the lines left out |
 
 | Call on `part(:id)` | Does |
 |---|---|
 | `pulse(lines)` | pulses those lines once, from 0, such as those a change just touched; asked as they change, they pulse as they show anew |
 
-**Keys:** with on_pick: as it is made, Up and Down walk the lines and confirm picks one; lines whose details do not all fit take a row each, and only the line with the cursor shows its detail; without, none
+**Keys:** with on_submit: as it is made, Up and Down walk the lines and confirm picks one; lines whose details do not all fit take a row each, and only the line with the cursor shows its detail; without, none
 
 **Pad:** as the keys
 
-**Mouse:** with on_pick: a click picks a line; a click on the last line tells on_more; resting on a line shows its tooltip
+**Mouse:** with on_submit: a click picks a line; a click on the last line tells on_more; resting on a line shows its tooltip
 
 **Places:** `note`, the parts at the end of each line's tooltip
 <!-- /generated -->

@@ -209,7 +209,7 @@ list mods, look: :cards, columns: 3, text: :name, bind: :mod,
 
 Each card shows its picture across its top at 16:9, its text, then its lines, the last one wrapped
 to two lines. `blur: true` blurs a picture that spoils the story and marks it "Spoiler". Two lines of cards show before
-the list scrolls (`lines_shown:`); with `height:` each line takes its share of it.
+the list scrolls (`most_rows:` counts lines of cards); `rows_shown:` with `height:` gives each line its share of it.
 
 ### Fewer cards across beside a drawer
 
@@ -344,15 +344,14 @@ Written `list items, ...`.
 | `submit_to:` | a Symbol or a text |  |  | the id: of another part of its window that a pick moves the focus to once on_submit heard it, such as the slots of the character picked |
 | `note_at:` | pixels, or an Array of texts of which the widest sets it |  |  | where the rows' notes start, so they stand in one column: pixels from a row's left, or texts, of which the widest fits before the notes after a row's box, label and icon; half the row by default; a long text pushes its note on |
 | `label_width:` | pixels, or an Array of texts of which the widest sets it |  |  | the width of the rows' label: column: pixels, or texts of which the widest sets it; the widest label of all rows by default, so a filter never moves it |
-| `most_rows:` | a whole number | `6` |  | the most rows it shows before it scrolls |
-| `rows_shown:` | a whole number, `:fill` |  |  | instead of most_rows:, a count of rows that share its height between them, each at least as high as its own, such as 6 rows of mods that fill a box; :fill shows as many whole rows as the room its column leaves holds |
+| `most_rows:` | a whole number |  |  | the most rows, with look: :cards lines of cards, before it scrolls; 6 rows or 2 lines |
+| `rows_shown:` | a whole number, `:fill` |  |  | instead of most_rows:, a count of rows that share its height between them, each at least as high as its own, such as 6 rows of mods that fill a box, with look: :cards a count of lines that share its height:; :fill shows as many whole rows as the room its column leaves holds |
 | `toggles:` | a lambda of one item, or its method name |  |  | an item's toggles, small on/off buttons at its row's end: an Array of { text:, on:, tooltip:, color: }, filled while on; a row Hash takes toggles: too |
 | `reorder:` | `false`, `:within_group` | `false` |  | :within_group lets the player move a row within its group by a drag |
 | `group:` | a lambda of one item, or its method name |  |  | an item's group, which reorder: keeps it within; by default the heading row above it |
 | `look:` | `:rows`, `:cards` | `:rows` |  | :cards shows each item as a card on a dark plate: its picture across its top, its text, then its lines |
 | `columns:` | a whole number |  |  | how many rows or cards stand side by side; 3 for cards, else 1; it may change while the list shows, such as 2 cards across beside an open drawer, and the cursor stays on its item, scrolled into sight |
 | `spacing:` | `0`, `1`, `2`, `3`, `4`, `5`, `6` |  |  | room between two columns of rows or cards, 4 px a unit; 2 for rows, else the cards' own |
-| `lines_shown:` | a whole number | `2` |  | how many lines of cards show before it scrolls; with height: each line takes its share |
 | `picture:` | a lambda of one item, or its method name |  |  | an item's picture: { file:, blur:, label:, badge: { text:, color: } }, blur: for a picture that spoils the story, marked Spoiler unless label: says otherwise, badge: a small text on a dark plate at its top left, such as Installed; a card shows it across its top, a row at its left; a row Hash takes picture: too |
 | `picture_width:` | a whole number | `96` |  | the width of a picture at a row's left, its height 16:9 of it; a row Hash takes picture_width: too |
 | `lines:` | a lambda of one item, or its method name |  |  | an item's lines under its text on a card or a row, such as ["by Ana", summary], on a card the last wrapped to two lines; a line is a text or { text:, color:, right: }, its right a text or parts [{ text:, icon:, color: }] at the line's end; a row Hash takes lines: too |

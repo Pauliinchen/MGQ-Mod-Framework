@@ -69,7 +69,7 @@ A class declares what its caller gives and what it keeps:
 | `param :footer, content: true` | markup the caller hands in as a lambda, placed with `children :footer` |
 | `state :page, 0` | the component's own value, written with `self.page = 1` |
 | `state(:notes) { [] }` | a fresh default per component |
-| `event :pick` | makes the `on_pick:` param, which `emit :pick, value` calls |
+| `event :submit` | makes the `on_submit:` param, which `emit :submit, value` calls |
 | `expose :actor` | a value another mod's `UI.patch` reads with `t.read(:actor)` |
 | `action :pulse` | a public method the owner calls through `part(:id).pulse` |
 | `watch { My_Mod.serial }` | renders again once the answer changes |
@@ -85,10 +85,10 @@ module Party_Picker
   # A card of one party member, which the player picks.
   class MemberCard < UI::Component
     param :actor
-    event :pick
+    event :submit
 
     def render
-      card clickable: true, on_click: -> { emit :pick, actor } do
+      card clickable: true, on_click: -> { emit :submit, actor } do
         card_media face: actor, height: 96, fit: :contain
         card_header actor.name, subtitle: "Level #{UI::Game.level(actor)}"
       end
@@ -102,7 +102,7 @@ module Party_Picker
         grid do
           $game_party.battle_members.each do |member|
             grid_item xs: 3, key: member.id do
-              member_card actor: member, on_pick: ->(actor) { close(actor) }
+              member_card actor: member, on_submit: ->(actor) { close(actor) }
             end
           end
         end

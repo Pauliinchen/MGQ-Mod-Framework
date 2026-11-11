@@ -2,6 +2,7 @@
 #  layer_alert_test.rb
 #
 #  Changelog:
+#      Paulinchen  2026-11-11: Gave the alert its close mark by on_close: alone
 #      Paulinchen  2026-11-06: Checked that the bar's line stands in the middle of its height
 #      Paulinchen  2026-11-05: Covered a notice whose text wraps into two lines at most
 #                            - Covered a toast whose text keeps the plain color beside the bar of its severity, and the icon
@@ -35,7 +36,7 @@ RESTART_BAR = <<-RUBY
       def render
         window "Mods" do
           list ["Map Display", "Level Cap"], bind: :mod
-          alert "3 changes wait for the game to start again.", severity: :warning, closeable: true, visible: waiting,
+          alert "3 changes wait for the game to start again.", severity: :warning, visible: waiting,
                 on_close: -> { self.waiting = false } do
             button "Restart now", id: :restart, on_click: -> { self.restarted = true }
           end

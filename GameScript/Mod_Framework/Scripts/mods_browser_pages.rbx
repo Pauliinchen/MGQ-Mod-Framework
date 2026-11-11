@@ -2,6 +2,7 @@
 #  mods_browser_pages.rbx
 #
 #  Changelog:
+#      Paulinchen  2026-11-11: Told the page link picked to on_submit in place of on_pick
 #      Paulinchen  2026-11-08: Showed a mod installed by hand without Install or Update, and left it out of a collection's install
 #      Paulinchen  2026-11-07: Created
 #
@@ -600,7 +601,7 @@ module Mod_Framework
       param :mod, nil
 
       # Tells the kind of the link picked, nil for the mod's page on the website.
-      event :pick
+      event :submit
 
       # Describes the dialog.
       def render
@@ -608,7 +609,7 @@ module Mod_Framework
                 Array((mod["details"] || {})["links"]).map { |kind, url| [kind, BrowserModPage::LINK_NAMES[kind] || kind.to_s, url] }
         dialog format(TEXTS[:title], mod["name"]), id: :mf_browser_links do
           pages.each do |kind, name, url|
-            button name, id: :"mf_browser_link_#{kind || 'site'}", tooltip: url, key: kind || :site, on_click: -> { close; emit(:pick, kind) }
+            button name, id: :"mf_browser_link_#{kind || 'site'}", tooltip: url, key: kind || :site, on_click: -> { close; emit(:submit, kind) }
           end
           button TEXTS[:back], id: :mf_browser_link_back, on_click: :close
         end

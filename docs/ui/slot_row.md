@@ -6,7 +6,7 @@
 
 `slot_row` is a row of icon slots, such as a party member's skills or the gems in an item's
 sockets. Each slot shows its icon, and resting the pointer on it shows its tooltip; an empty slot
-shows the empty mark. With `on_pick` the player picks a slot by the keys or a click. The row
+shows the empty mark. With `on_submit` the player picks a slot by the keys or a click. The row
 wraps when it is full.
 
 ## Examples
@@ -24,7 +24,7 @@ slot_row actor.skills.first(6).map { |skill| { icon: skill.icon_index, tooltip: 
 <!-- example: slot_row-pick -->
 ```ruby
 slot_row actor.skills.first(6).map { |skill| { icon: skill.icon_index, tooltip: skill.name } },
-         note: "Click to put it first", on_pick: ->(place) { toast actor.skills[place].name }
+         note: "Click to put it first", on_submit: ->(place) { toast actor.skills[place].name }
 ```
 ![A skill's tooltip ending in the note, fading in](images/slot_row-pick.gif)
 
@@ -59,7 +59,7 @@ component's state as it opens, and the slots are not made anew while only what i
 <!-- example: slot_row-pulse -->
 ```ruby
 slot_row actor.skills.first(6).map { |skill| { icon: skill.icon_index, tooltip: skill.name } },
-         id: :skills, on_pick: ->(place) { part(:skills).pulse([place]) }
+         id: :skills, on_submit: ->(place) { part(:skills).pulse([place]) }
 ```
 ![A slot pulsing as it is picked](images/slot_row-pulse.gif)
 
@@ -85,13 +85,13 @@ Written `slot_row slots, ...`.
 
 | Event | Tells |
 |---|---|
-| `on_pick` | the slot picked, from 0 |
+| `on_submit` | the slot picked, from 0 |
 
 | Call on `part(:id)` | Does |
 |---|---|
 | `pulse(slots)` | pulses those slots once, from 0, such as those a change just touched; asked as they change, they pulse as they show anew |
 
-**Keys:** with on_pick: as it is made, each slot takes the keys and confirm picks it; without, the keys pass over them
+**Keys:** with on_submit: as it is made, each slot takes the keys and confirm picks it; without, the keys pass over them
 
 **Pad:** as the keys
 

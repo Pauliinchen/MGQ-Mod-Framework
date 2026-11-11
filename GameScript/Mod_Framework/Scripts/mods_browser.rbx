@@ -4,6 +4,7 @@
 #  Changelog:
 #      Paulinchen  2026-11-11: Left turning a collection on, the mods it keeps on, the needs an install brings and finding a mod by
 #                              a name to the DLL
+#                            - Named the card lines by rows_shown: and the page links' pick by on_submit
 #      Paulinchen  2026-11-09: Said on the bar when an upvote could not start
 #      Paulinchen  2026-11-08: Left the mods installed by hand out of Update all, a collection's install and the install of a mod's needs, and named them on the bar and in the log
 #      Paulinchen  2026-11-07: Highlighted the text searched for in the names on the cards
@@ -795,7 +796,7 @@ module Mod_Framework
         links = Array((mod["details"] || {})["links"])
         return open_page_of(mod) if links.empty?
 
-        UI.open(BrowserLinks, :mod => mod, :on_pick => ->(link) { open_page_of(mod, link) })
+        UI.open(BrowserLinks, :mod => mod, :on_submit => ->(link) { open_page_of(mod, link) })
       end
 
       # Opens a mod's or a collection's page in the player's web browser, or a link of a mod, and
@@ -1047,7 +1048,7 @@ module Mod_Framework
         shown = mods
         if view == :cards
           beside = filters_open && FILTERS_VARIANT != :temporary
-          list shown, look: :cards, columns: beside ? CARD_COLUMNS_BESIDE : CARD_COLUMNS, lines_shown: CARD_LINES, height: Graphics.height - CARDS_ROOM, highlight: search,
+          list shown, look: :cards, columns: beside ? CARD_COLUMNS_BESIDE : CARD_COLUMNS, rows_shown: CARD_LINES, height: Graphics.height - CARDS_ROOM, highlight: search,
                       id: :mf_browser_cards, click_picks: true, row: ->(mod) { card_row(mod) }, empty: empty_text, on_submit: ->(mod) { open_page(mod["id"]) }
         else
           list shown, rows_shown: LIST_LINES, height: :fill, id: :mf_browser_rows, click_picks: true, row: ->(mod) { list_row(mod) }, empty: empty_text,

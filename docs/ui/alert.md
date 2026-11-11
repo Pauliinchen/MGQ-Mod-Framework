@@ -36,12 +36,12 @@ end
 
 <!-- example: alert-closeable -->
 ```ruby
-alert "Map Display has an update.", severity: :info, dense: true, closeable: true,
+alert "Map Display has an update.", severity: :info, dense: true,
                                     visible: update_shown, on_close: -> { self.update_shown = false }
 ```
 ![A low alert with a close mark](images/alert-closeable.png)
 
-The close mark tells `on_close`; the alert stays until you hide it, here by its state.
+`on_close` gives the alert a close mark at its end, which tells it; the alert stays until you hide it, here by its state.
 
 ### Toasts in the plain text color
 
@@ -95,11 +95,10 @@ Written `alert text, ...` with a `do ... end` block of markup.
 | `text_color:` | a color name such as :primary or :rainbow, "#RRGGBB", [r, g, b] or a game text color such as 2 |  |  | its text's color instead of its severity's, which keeps the bar, such as :text for a toast in the plain text color |
 | `dense:` | true, false | `false` |  | lower, with less room above and below its text |
 | `most_lines:` | a whole number |  |  | its text breaks into lines that fit, at most this many; the last ends in ... and the whole text becomes its tooltip; without it one line cut to its room |
-| `closeable:` | true, false | `false` |  | a close mark at its end that tells on_close; hide it there |
 
 | Event | Tells |
 |---|---|
-| `on_close` | nothing; the player clicked its close mark or pressed it |
+| `on_close` | nothing; the player clicked its close mark, which shows at its end only with on_close:, or pressed it; hide it there |
 
 **Keys:** none of its own: the keys reach its buttons and its close mark
 

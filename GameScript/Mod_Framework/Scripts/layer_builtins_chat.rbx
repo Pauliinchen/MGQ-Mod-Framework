@@ -2,6 +2,7 @@
 #  layer_builtins_chat.rbx
 #
 #  Changelog:
+#      Paulinchen  2026-11-11: Told a taken item of menu to on_submit in place of on_pick
 #      Paulinchen  2026-11-06: Opened the items of menu as the menus of UI.menu, dialogs of the UI layer
 #      Paulinchen  2026-11-05: Stopped the typing of a field in a log's window as a name in the log is clicked
 #                            - Added menu, a button that opens a menu of items, sub-menus of items within them
@@ -80,7 +81,7 @@ module Mod_Framework
         end
 
         # Opens a menu's items on the side of its button as UI.menu opens its choices: an item with
-        # items: opens them beside its row, an item taken tells on_pick, a disabled one on_refuse. A
+        # items: opens them beside its row, an item taken tells on_submit, a disabled one on_refuse. A
         # menu open elsewhere refuses it with the buzzer.
         #
         # @param part [Object] The layer's part of the menu.
@@ -91,7 +92,7 @@ module Mod_Framework
           refused = lambda { |item, _index| Layer.dispatch(part, :on_refuse, [item]) if item && !part.gone }
           place = { :under => part.engine, :side => params[:side] || :bottom, :from => part.engine }
           opened = Menus.open(Array(items), place, refused) do |item, _index|
-            Layer.dispatch(part, :on_pick, [item]) if item && !part.gone
+            Layer.dispatch(part, :on_submit, [item]) if item && !part.gone
           end
           Sound.play_buzzer unless opened
         rescue StandardError => e
@@ -106,7 +107,7 @@ module Mod_Framework
                                          :items => { :type => :menu_items, :default => [],
                                                      :doc => "its items, each a text or { text:, disabled:, tooltip:, data:, items: }: disabled: true greys it out, items: opens a menu of its own; a lambda is asked as it opens" },
                                          :side => { :values => MENU_SIDES, :default => :bottom, :doc => "the side of its button it opens on, lined up with the button's left or top" } },
-                            :events => { :pick => "the item the player took, as given", :refuse => "the item with disabled: true the player tried to take, which buzzed" },
+                            :events => { :submit => "the item the player took, as given", :refuse => "the item with disabled: true the player tried to take, which buzzed" },
                             :keys => "confirm on its button opens it; Up and Down move and go round; confirm takes an item or opens its items; cancel closes it, or steps back from the items of an item",
                             :pad => "A opens it and takes; B closes it or steps back",
                             :mouse => "a click on its button opens it; pointing picks an item and a click takes it; a click outside closes it",

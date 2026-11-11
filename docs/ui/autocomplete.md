@@ -7,7 +7,7 @@
 `autocomplete` is a text field with a list of matches under it, as MudBlazor's autocomplete. As the
 player types, it offers the items that hold the whole text typed anywhere, ignoring case, by the
 same rule as a [text field](text_field.md)'s `completions:`. Up and Down light a match; Enter, Tab
-or a click takes it, which becomes the field's text and tells `on_select`. The first cancel hides
+or a click takes it, which becomes the field's text and tells `on_complete`. The first cancel hides
 the matches and stops typing, as in every text field.
 
 - `items:` is an Array, narrowed as the player types, or a lambda of the text that answers its own
@@ -22,7 +22,7 @@ the matches and stops typing, as in every text field.
 ```ruby
 autocomplete "Member", bind: :member_name, placeholder: "Name",
              items: UI::Game.members.map { |actor| actor.name },
-             on_select: ->(name) { self.member_name = name }
+             on_complete: ->(name) { self.member_name = name }
 ```
 ![The field under its label with the names that hold the letters typed](images/autocomplete-member.png)
 
@@ -57,7 +57,7 @@ Written `autocomplete label, ...`.
 | Event | Tells |
 |---|---|
 | `on_change` | its text, as the player typed it |
-| `on_select` | the match taken, which is its text now |
+| `on_complete` | the match taken, which is its text now, and its place among the matches |
 | `on_submit` | its text, as Enter gave it with no match lit |
 
 **Keys:** typing as in a text field; Up and Down light a match, Enter or Tab takes it; the first cancel hides the matches and stops typing

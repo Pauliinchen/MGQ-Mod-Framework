@@ -190,7 +190,7 @@ module Mod_Framework
 
         # Declares an event: the on_name param the caller gives, which emit calls.
         #
-        # @param name [Symbol] Its name, such as :pick for on_pick.
+        # @param name [Symbol] Its name, such as :submit for on_submit.
         def event(name)
           own_params[:"on_#{name}"] = { :default => nil, :handler => true }
           forget_declaration

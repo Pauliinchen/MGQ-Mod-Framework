@@ -2,6 +2,7 @@
 #  layer_ui_menu_test.rb
 #
 #  Changelog:
+#      Paulinchen  2026-11-11: Heard an item taken through on_submit
 #      Paulinchen  2026-11-07: Greyed rows and choices with disabled:
 #      Paulinchen  2026-11-06: Checked that the items of menu open as the root mf_menu of the UI layer, which cancel closes alone
 #                            - Checked that the items of a choice stay above their menu once it rendered again
@@ -36,7 +37,7 @@ PARTY_PAGE = <<-RUBY
 
       def render
         window "Party" do
-          menu "Ana", id: :ana_menu, on_pick: ->(item) { self.picked = picked + [item] },
+          menu "Ana", id: :ana_menu, on_submit: ->(item) { self.picked = picked + [item] },
                       on_refuse: ->(item) { self.refused = refused + [item[:text]] },
                       items: ["Invite", { text: "Trade", items: ["Gold", "Herbs"] },
                               { text: "Duel", disabled: true, tooltip: "Not in a battle." }]
@@ -74,7 +75,7 @@ in_game_folder do
     check("the refused item, and the menu after it", [page.refused, first.open?], [["Duel"], true])
 
     # Trade opens Gold and Herbs beside its row, right of the first menu, as narrow as its items;
-    # Gold reaches on_pick and both menus close.
+    # Gold reaches on_submit and both menus close.
     tree.rects[first.node] = [40, 84, first.width, 96]
     tree.rects[menu_list.call(first).node] = [52, 96, first.width - 24, 72]
     frame

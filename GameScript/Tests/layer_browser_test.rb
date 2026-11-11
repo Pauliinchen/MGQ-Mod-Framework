@@ -2,6 +2,7 @@
 #  layer_browser_test.rb
 #
 #  Changelog:
+#      Paulinchen  2026-11-11: Covered a list of cards one line high by most_rows:
 #      Paulinchen  2026-11-06: Checked that a card's last line ends with the ellipsis where more does not fit
 #                            - Called the engine's classes by their names under UI::Engine
 #                            - Covered cards a click picks at once
@@ -49,6 +50,14 @@ BROWSER = <<-RUBY
                        picture: ->(mod) { { file: mod.shot, blur: mod.spoiler } },
                        lines: ->(mod) { ["by \#{mod.author}", mod.summary] }
           end
+        end
+      end
+    end
+
+    class OneLine < UI::Component
+      def render
+        window "Mods", width: 620 do
+          list Camp_Browser.mods, look: :cards, most_rows: 1, text: :name, bind: :mod, picture: ->(mod) { { file: mod.shot } }
         end
       end
     end
@@ -126,6 +135,16 @@ in_game_folder do
     frame
     Graphics.update
     check("two cards across, the cursor still on Wide Text", [props["row_cells"], cards.index, browser.mod.name], [2, 3, "Wide Text"])
+
+    # most_rows: counts lines of cards: the four cards take two lines, of which one shows and the
+    # other scrolls.
+    one_line = ui.open(Camp_Browser::OneLine)
+    frame
+    Graphics.update
+    one = ui::Engine::Tree.component(nodes_of(tree, "list").last)
+    check("a list of cards with most_rows: 1 is one line high and scrolls the second", [one.send(:lines_of, one.rows.size), one.measure[1]], [2, one.line_height])
+    one_line.close
+    frame
 
     # The list view: each mod a row with its screenshot at the left, as high as the picture; the six
     # rows share the height the box gives the list once it is placed.

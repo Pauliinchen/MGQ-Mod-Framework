@@ -21,11 +21,11 @@ under a part, such as when the player clicks a name.
 <!-- example: menu-items -->
 ```ruby
 menu "Ana", items: ["Invite", "Trade", { text: "Duel", disabled: true, tooltip: "Not in a battle." }],
-            on_pick: ->(item) { act_on("Ana", item) }
+            on_submit: ->(item) { act_on("Ana", item) }
 ```
 ![A button whose menu opens under it, Duel greyed out](images/menu-items.gif)
 
-An item is a text or `{ text:, disabled:, tooltip:, data:, items: }`. `on_pick` gets the item as you
+An item is a text or `{ text:, disabled:, tooltip:, data:, items: }`. `on_submit` gets the item as you
 gave it; an item with `disabled: true` is greyed out, buzzes and tells `on_refuse` instead.
 
 ### Items of an item
@@ -33,7 +33,7 @@ gave it; an item with `disabled: true` is greyed out, buzzes and tells `on_refus
 <!-- example: menu-sub -->
 ```ruby
 menu "Party", items: [{ text: "Leader", items: ["Luka", "Alice"] }, { text: "Formation", items: ["Save", "Load"] }, "Status"],
-              on_pick: ->(item) { party(item) }
+              on_submit: ->(item) { party(item) }
 ```
 ![A menu whose item opens a second menu beside its row](images/menu-sub.gif)
 
@@ -92,7 +92,7 @@ Written `menu label, ...`.
 
 | Event | Tells |
 |---|---|
-| `on_pick` | the item the player took, as given |
+| `on_submit` | the item the player took, as given |
 | `on_refuse` | the item with disabled: true the player tried to take, which buzzed |
 
 **Keys:** confirm on its button opens it; Up and Down move and go round; confirm takes an item or opens its items; cancel closes it, or steps back from the items of an item

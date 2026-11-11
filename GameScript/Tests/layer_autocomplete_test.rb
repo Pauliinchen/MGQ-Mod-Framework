@@ -2,6 +2,7 @@
 #  layer_autocomplete_test.rb
 #
 #  Changelog:
+#      Paulinchen  2026-11-11: Heard the match taken through on_complete
 #      Paulinchen  2026-11-07: Checked that a form with a required autocomplete refuses it empty and is sent once a match is taken
 #                            - Created
 #
@@ -10,7 +11,7 @@
 # Covers the autocomplete of the UI layer in a booted game against FakeTree and the DLL's text box,
 # through a mod's quest search: the matches of the whole text typed, anywhere in a quest's name and
 # ignoring case, in a box under the field from its left; Enter takes the lit match, which becomes
-# the field's text, the bound state's and what on_select hears; its form refuses it empty, as it is
+# the field's text, the bound state's and what on_complete hears; its form refuses it empty, as it is
 # required, and is sent once a match is taken.
 
 require_relative "layer_support"
@@ -29,7 +30,7 @@ QUEST_SEARCH = <<-RUBY
         window "Quests" do
           form bind_valid: :ready, on_submit: -> { self.sent += 1 } do
             autocomplete "Quest", bind: :quest, items: ["Find the herbs", "The herbalist's request", "Rope bridge"], required: "Pick a quest",
-                         on_select: ->(name) { self.picked = picked + [name] }
+                         on_complete: ->(name) { self.picked = picked + [name] }
             button "Search", on_click: :submit
           end
         end
@@ -71,7 +72,7 @@ in_game_folder do
     $dll.post("ui.edit", "id" => opened.size, "text" => "HERB", "cursor" => 4, "shown" => true, "outcomes" => ["enter"], "keys" => 1, "chars" => 0)
     frame
     frame
-    check("Enter takes the lit match as the whole text, which the bound state keeps and on_select hears",
+    check("Enter takes the lit match as the whole text, which the bound state keeps and on_complete hears",
           [field.text, search.quest, search.picked, field.completions], ["Find the herbs", "Find the herbs", ["Find the herbs"], []])
     tell(tree, [[ui::Engine::Tree.component(nodes_of(tree, "button").last).node, "click"]])
     check("the form is sent with the match taken [error, ready, sent, a failed validate: logged]",

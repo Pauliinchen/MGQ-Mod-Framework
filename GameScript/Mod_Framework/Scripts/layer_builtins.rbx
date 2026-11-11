@@ -2,6 +2,8 @@
 #  layer_builtins.rbx
 #
 #  Changelog:
+#      Paulinchen  2026-11-11: Gave an alert its close mark by on_close: alone, without closeable:
+#                            - Counted a list's lines of cards by most_rows: or rows_shown:, without lines_shown:
 #      Paulinchen  2026-11-10: Told a list's on_refuse the item and the step of a dim arrow Left or Right pressed
 #      Paulinchen  2026-11-09: Gave an image scale: :auto, which scales it to its room at any factor keeping its proportions, and sampling:
 #                            - Passed padding_shrinks: on to every part
@@ -522,16 +524,25 @@ module Mod_Framework
           row
         end
 
-        # Tells the height of a list's cards: a share of its height: by its lines_shown:, else a
+        # Tells the height of a list's cards: a share of its height: by its lines of cards, else a
         # card's height with a picture across its top or without.
         #
         # @param params [Hash] The list's params.
         # @param rows [Array<Hash>] The cards.
         # @return [Integer] The pixels.
         def self.card_height(params, rows)
-          return params[:height] / (params[:lines_shown] || 2) if params[:height].is_a?(Integer)
+          return params[:height] / card_lines(params) if params[:height].is_a?(Integer)
 
           rows.any? { |row| row[:picture] && row[:picture_at] != :left } ? CARD_HEIGHT : TEXT_CARD_HEIGHT
+        end
+
+        # Tells how many lines of cards a list shows before it scrolls: its rows_shown: count, else its
+        # most_rows:, else 2.
+        #
+        # @param params [Hash] The list's params.
+        # @return [Integer] The lines.
+        def self.card_lines(params)
+          params[:rows_shown].is_a?(Integer) ? params[:rows_shown] : params[:most_rows] || 2
         end
 
         # Tells the height of a list's rows with lines: as high as the highest row's picture at its
@@ -998,16 +1009,15 @@ module Mod_Framework
                                          :text_color => { :type => :color, :doc => "its text's color instead of its severity's, which keeps the bar, such as :text for a toast in the plain text color" },
                                          :dense => { :type => :bool, :default => false, :doc => "lower, with less room above and below its text" },
                                          :most_lines => { :type => :count,
-                                                          :doc => "its text breaks into lines that fit, at most this many; the last ends in ... and the whole text becomes its tooltip; without it one line cut to its room" },
-                                         :closeable => { :type => :bool, :default => false, :doc => "a close mark at its end that tells on_close; hide it there" } },
-                            :events => { :close => "nothing; the player clicked its close mark or pressed it" },
+                                                          :doc => "its text breaks into lines that fit, at most this many; the last ends in ... and the whole text becomes its tooltip; without it one line cut to its room" } },
+                            :events => { :close => "nothing; the player clicked its close mark, which shows at its end only with on_close:, or pressed it; hide it there" },
                             :keys => "none of its own: the keys reach its buttons and its close mark", :pad => "as the keys",
                             :mouse => "a click on its close mark tells on_close",
                             :make => lambda { |options| Alert.new(options) },
                             :options => lambda do |params|
                               severity = SEVERITY_COLORS[params[:severity] || :normal]
                               common(params).merge(:text => params[:text].to_s, :color => color(params[:text_color]) || severity || :text, :accent => severity, :icon => params[:icon],
-                                                   :dense => params[:dense] == true, :closeable => params[:closeable] == true, :align_text => :start,
+                                                   :dense => params[:dense] == true, :closeable => !params[:on_close].nil?, :align_text => :start,
                                                    :most_lines => params[:most_lines])
                             end,
                             :wire => lambda { |part| part.engine.on(:close) { Layer.dispatch(part, :on_close, []) } },
@@ -1551,10 +1561,10 @@ module Mod_Framework
                                                        :doc => "where the rows' notes start, so they stand in one column: pixels from a row's left, or texts, of which the widest fits before the notes after a row's box, label and icon; " \
                                                                "half the row by default; a long text pushes its note on" },
                                          :label_width => { :type => :measure, :doc => "the width of the rows' label: column: pixels, or texts of which the widest sets it; the widest label of all rows by default, so a filter never moves it" },
-                                         :most_rows => { :type => :int, :default => 6, :doc => "the most rows it shows before it scrolls" },
+                                         :most_rows => { :type => :int, :doc => "the most rows, with look: :cards lines of cards, before it scrolls; 6 rows or 2 lines" },
                                          :rows_shown => { :type => :count, :values => [:fill],
-                                                          :doc => "instead of most_rows:, a count of rows that share its height between them, each at least as high as its own, such as 6 rows of mods that fill a box; " \
-                                                                  ":fill shows as many whole rows as the room its column leaves holds" },
+                                                          :doc => "instead of most_rows:, a count of rows that share its height between them, each at least as high as its own, such as 6 rows of mods that fill a box, " \
+                                                                  "with look: :cards a count of lines that share its height:; :fill shows as many whole rows as the room its column leaves holds" },
                                          :toggles => { :kind => :item,
                                                        :doc => "an item's toggles, small on/off buttons at its row's end: an Array of { text:, on:, tooltip:, color: }, filled while on; a row Hash takes toggles: too" },
                                          :reorder => { :values => [false, :within_group], :default => false,
@@ -1568,7 +1578,6 @@ module Mod_Framework
                                                     :doc => ":cards shows each item as a card on a dark plate: its picture across its top, its text, then its lines" },
                                          :columns => { :type => :int, :doc => "how many rows or cards stand side by side; 3 for cards, else 1; it may change while the list shows, such as 2 cards across beside an open drawer, and the cursor stays on its item, scrolled into sight" },
                                          :spacing => { :values => (0..6).to_a, :doc => "room between two columns of rows or cards, 4 px a unit; 2 for rows, else the cards' own" },
-                                         :lines_shown => { :type => :int, :default => 2, :doc => "how many lines of cards show before it scrolls; with height: each line takes its share" },
                                          :picture => { :kind => :item, :doc => "an item's picture: { file:, blur:, label:, badge: { text:, color: } }, blur: for a picture that spoils the story, marked Spoiler unless label: says otherwise, " \
                                                                                      "badge: a small text on a dark plate at its top left, such as Installed; a card shows it across its top, a row at its left; a row Hash takes picture: too" },
                                          :picture_width => { :type => :int, :default => 96, :doc => "the width of a picture at a row's left, its height 16:9 of it; a row Hash takes picture_width: too" },
@@ -1597,7 +1606,7 @@ module Mod_Framework
                                                                                   :reorder => reorder, :move_hotkeys => reorder && params[:move_hotkeys] == true, :columns => params[:columns] || (cards ? 3 : 1),
                                                                                   :highlight => params[:highlight] && params[:highlight].to_s)
                               if cards
-                                options.merge!(:row_height => card_height(params, rows), :most_rows => params[:lines_shown] || 2, :cell_gap => CARD_GAP)
+                                options.merge!(:row_height => card_height(params, rows), :most_rows => card_lines(params), :cell_gap => CARD_GAP)
                                 options.delete(:height)
                               end
                               options[:cell_gap] = spacing(params[:spacing]) if params[:spacing]
@@ -1609,7 +1618,7 @@ module Mod_Framework
                               options[:row_height] = lined_height(rows) if !cards && rows.any? { |row| lined_row?(row) }
                               tallest = avatar_height(rows)
                               options[:row_height] = [options[:row_height].to_i, tallest].max if tallest > 0
-                              options.merge!(:rows_shown => params[:rows_shown], :share_room => params[:rows_shown].is_a?(Integer)) if params[:rows_shown]
+                              options.merge!(:rows_shown => params[:rows_shown], :share_room => params[:rows_shown].is_a?(Integer)) if params[:rows_shown] && !cards
                               options[:escapes] = true if params[:escapes]
                               options[:describe] = true if params[:describe]
                               options[:click_picks] = true if params[:click_picks]

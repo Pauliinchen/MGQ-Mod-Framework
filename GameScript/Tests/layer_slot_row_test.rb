@@ -2,6 +2,7 @@
 #  layer_slot_row_test.rb
 #
 #  Changelog:
+#      Paulinchen  2026-11-11: Heard a slot picked through on_submit
 #      Paulinchen  2026-11-09: Checked tooltips of markup on the slots of a slot row and the lines of lines, read anew as the
 #                              state changes while the slots stay as they are
 #      Paulinchen  2026-11-05: Created
@@ -28,7 +29,7 @@ BAR = <<-RUBY
       def render
         window "Skills" do
           slot_row skills, id: :bar, empty_icon: 16, empty_tooltip: "No skill", empty: "No skills learned", note: "Click to use",
-                           on_pick: ->(place) { self.picked = picked + [place]; part(:bar).pulse([place]) }
+                           on_submit: ->(place) { self.picked = picked + [place]; part(:bar).pulse([place]) }
         end
       end
     end
@@ -38,7 +39,7 @@ BAR = <<-RUBY
 
       def render
         window "Spells" do
-          slot_row [{ icon: 64, tooltip: -> { text "Heal"; text "\#{cost} MP", color: :system } }], note: "Click to cast", on_pick: ->(place) {}
+          slot_row [{ icon: 64, tooltip: -> { text "Heal"; text "\#{cost} MP", color: :system } }], note: "Click to cast", on_submit: ->(place) {}
           lines [{ label: "Magic", lines: [{ text: "Heal", tooltip: -> { text "Restores HP for \#{cost} MP" } }] }]
         end
       end

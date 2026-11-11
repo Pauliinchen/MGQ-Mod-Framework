@@ -2,6 +2,7 @@
 #  layer_builtins_game.rbx
 #
 #  Changelog:
+#      Paulinchen  2026-11-11: Told a slot of slot_row and a line of lines picked to on_submit in place of on_pick
 #      Paulinchen  2026-11-09: Added title_after: to header, parts right after its title
 #                            - Let a slot of slot_row and a line of lines take a tooltip of markup
 #      Paulinchen  2026-11-07: Removed equip_compare and gem_compare, which the components Compare and GemCompare of UI::Equip replace
@@ -95,18 +96,18 @@ module Mod_Framework
                                          :empty_tooltip => { :type => :text, :doc => "the tooltip of an empty slot" },
                                          :empty => { :type => :text, :doc => "what shows, dim, in place of the row without slots" },
                                          :note => { :kind => :content, :type => :text, :doc => "parts at the end of the tooltip of each slot that is not empty, such as \"Click to change\"" } },
-                            :events => { :pick => "the slot picked, from 0" },
+                            :events => { :submit => "the slot picked, from 0" },
                             :actions => { :pulse => pulse_doc("slots").merge(:call => lambda { |part, places| Layer.after_render { part.engine.pulse(Array(places)) unless part.gone } }) },
-                            :keys => "with on_pick: as it is made, each slot takes the keys and confirm picks it; without, the keys pass over them",
+                            :keys => "with on_submit: as it is made, each slot takes the keys and confirm picks it; without, the keys pass over them",
                             :pad => "as the keys", :mouse => "a click picks a slot; resting on one shows its tooltip",
                             :places => "`note`, the parts at the end of each slot's tooltip",
                             :make => lambda { |options| Slots.new(options) },
                             :options => lambda do |params|
                               common(params).merge(:slots => markup_tips(params[:slots])[0], :empty_icon => params[:empty_icon], :empty_tooltip => params[:empty_tooltip],
-                                                   :none => params[:empty].to_s, :acts => !params[:on_pick].nil?)
+                                                   :none => params[:empty].to_s, :acts => !params[:on_submit].nil?)
                             end,
                             :tips => lambda { |params| markup_tips(params[:slots])[1] },
-                            :wire => lambda { |part| part.engine.on(:click) { |place, _slot| Layer.dispatch(part, :on_pick, [place]) } if part.node.params[:on_pick] },
+                            :wire => lambda { |part| part.engine.on(:click) { |place, _slot| Layer.dispatch(part, :on_submit, [place]) } if part.node.params[:on_submit] },
                             :sync => lambda { |part, _wanted| Layer.sync_note(part) })
 
         Declarations.define(:header,
@@ -175,17 +176,17 @@ module Mod_Framework
                                          :empty => { :type => :text, :doc => "a dim line that shows without lines" },
                                          :most_rows => { :type => :int, :doc => "the most rows it asks room for, such as one in a compact form; given more room it still shows what the room holds" },
                                          :note => { :kind => :content, :type => :text, :doc => "parts at the end of the tooltip of each line that has one, such as \"Confirm to change\"" } },
-                            :events => { :pick => "the line picked, from 0 among all of them; with on_pick: each line takes the keys",
+                            :events => { :submit => "the line picked, from 0 among all of them; with on_submit: each line takes the keys",
                                          :more => "the last line, which tells how many more lines there are, was clicked: the lines left out" },
                             :actions => { :pulse => pulse_doc("lines").merge(:call => lambda { |part, places| Layer.after_render { Array(places).each { |place| part.engine.pulse(place) } unless part.gone } }) },
-                            :keys => "with on_pick: as it is made, Up and Down walk the lines and confirm picks one; lines whose details do not all fit " \
+                            :keys => "with on_submit: as it is made, Up and Down walk the lines and confirm picks one; lines whose details do not all fit " \
                                      "take a row each, and only the line with the cursor shows its detail; without, none",
-                            :pad => "as the keys", :mouse => "with on_pick: a click picks a line; a click on the last line tells on_more; resting on a line shows its tooltip",
+                            :pad => "as the keys", :mouse => "with on_submit: a click picks a line; a click on the last line tells on_more; resting on a line shows its tooltip",
                             :places => "`note`, the parts at the end of each line's tooltip",
                             :make => lambda { |options| Lines.new(options) },
                             :options => lambda do |params|
                               size = params[:size] || :small
-                              picks = !params[:on_pick].nil?
+                              picks = !params[:on_submit].nil?
                               options = common(params).merge(:lines => markup_tips(params[:lines])[0], :columns => params[:columns] || 1, :span => params[:span] == true,
                                                              :titles => params[:titles] != false, :sort => params[:sort] == true ? true : nil, :font_size => LINE_SIZES[size],
                                                              :row_height => LINE_ROWS[size], :color => color(params[:color]), :escapes => params[:escapes] == true,
@@ -200,7 +201,7 @@ module Mod_Framework
                             :tips => lambda { |params| markup_tips(params[:lines])[1] },
                             :wire => lambda do |part|
                               part.engine.on(:more) { |rest| Layer.dispatch(part, :on_more, [rest]) }
-                              part.engine.on(:submit) { |_line, place| Layer.dispatch(part, :on_pick, [place]) } if part.node.params[:on_pick]
+                              part.engine.on(:submit) { |_line, place| Layer.dispatch(part, :on_submit, [place]) } if part.node.params[:on_submit]
                             end,
                             :sync => lambda { |part, _wanted| Layer.sync_note(part) })
       end

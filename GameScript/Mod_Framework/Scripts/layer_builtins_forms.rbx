@@ -2,6 +2,7 @@
 #  layer_builtins_forms.rbx
 #
 #  Changelog:
+#      Paulinchen  2026-11-11: Named the match an autocomplete takes complete, told to on_complete with its place
 #      Paulinchen  2026-11-09: Checked a field's caption_width: as pixels or texts of which the widest sets it
 #                            - Told that an autocomplete in a field titles its letter pages by the field's caption
 #      Paulinchen  2026-11-08: Told that an autocomplete shows its placeholder while the player types too
@@ -161,7 +162,7 @@ module Mod_Framework
                                                                      :doc => "what it offers: an Array, narrowed to the items that hold the text anywhere, ignoring case, or a lambda of the text answering its own matches" },
                                                          :placeholder => { :kind => :live, :type => :text, :doc => "a dim text it shows while it is empty, also while the player types, such as \"Search\"" },
                                                          :max_length => { :type => :int, :doc => "the most characters it takes" }).merge(FORM_INPUT),
-                            :events => { :change => "its text, as the player typed it", :select => "the match taken, which is its text now",
+                            :events => { :change => "its text, as the player typed it", :complete => "the match taken, which is its text now, and its place among the matches",
                                          :submit => "its text, as Enter gave it with no match lit" },
                             :keys => "typing as in a text field; Up and Down light a match, Enter or Tab takes it; the first cancel hides the matches and stops typing",
                             :pad => "A opens the game's letter pages, titled by its label: or else the caption of the field it sits in; B as cancel", :mouse => "a click puts the caret there and types; a click on a match takes it",
