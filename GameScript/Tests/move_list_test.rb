@@ -2,6 +2,7 @@
 #  move_list_test.rb
 #
 #  Changelog:
+#      Paulinchen  2026-11-11: Removed the check of a filter refusing a move, since no filter reaches the engine list
 #      Paulinchen  2026-11-07: Greyed rows and choices with disabled:
 #      Paulinchen  2026-11-06: Called the engine's classes by their names under UI::Engine
 #      Paulinchen  2026-11-05: Checked that a carried row stays within the run of rows of its group
@@ -48,14 +49,11 @@ in_game_folder do
     frame
     check("a drop leaves it there and tells moved once", moved, [["Level Cap", 3, 5]])
 
-    # Cancel puts a carried row back, and a filter refuses the move.
+    # Cancel puts a carried row back.
     list.start_move(1)
     tree.post("events", [[list.node, "change", 2], [list.node, "uncarry"]])
     frame
     check("cancel puts the row back where it came from", names.call[1, 2], ["Bridge", "Core"])
-    list.filter = "core"
-    check("a filter refuses the move", list.start_move, false)
-    list.filter = ""
 
     # A step moves the cursor's row within its group, but not past its first row.
     list.index = 2

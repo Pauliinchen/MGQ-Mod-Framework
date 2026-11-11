@@ -2,6 +2,7 @@
 #  components_list.rbx
 #
 #  Changelog:
+#      Paulinchen  2026-11-11: Removed the text filter, :only, narrow, :keep_cursor, :no_match_text and set_row, which only the layer's filter: replaced
 #      Paulinchen  2026-11-10: Told refuse with the step of a dim arrow Left or Right pressed
 #                            - Named the list in the log by its class and id again instead of its describe option
 #      Paulinchen  2026-11-09: Kept a table cell's avatar picture scaled at any factor with the list
@@ -34,9 +35,9 @@ module Mod_Framework
       # :shoulder_pages is false, L and R. Its rows draw on a picture of their own, so a cursor move
       # redraws them alone. Without :rows_shown it is as high as its rows, up to :most_rows (SHOWN),
       # and scrolls the rest. With :rows_shown => :fill it takes the room its column leaves, as one
-      # that grows does, and shows only whole rows, as many as that room holds. :index => :first_found
-      # starts the cursor on the first row a search can find. A row of an item with :count shows how
-      # many the bag holds at its right. With :submit_to a picked row also moves the focus there.
+      # that grows does, and shows only whole rows, as many as that room holds. A row of an item with
+      # :count shows how many the bag holds at its right. With :submit_to a picked row also moves the
+      # focus there.
       #
       # With :columns it shows that many rows side by side on each line, filled line by line from the
       # left as the game's equip and item lists do, in cells of one width :cell_gap apart, each row
@@ -51,7 +52,7 @@ module Mod_Framework
       # ({:file, :blur, :fit, :badge => {:text, :color}, :label}, see PictureLook) shows as a card: the
       # picture across the top of its cell, then its text squeezed or cut to one line and its :note,
       # small, on the line under it. With :columns that makes a grid of cards that keeps all a list
-      # has: the cursor, filters, steering and the wheel. A picture file loads once and is let go once
+      # has: the cursor, steering and the wheel. A picture file loads once and is let go once
       # no row names it. With :leave_sides RIGHT on the last row of a line and LEFT on the first
       # move the focus to the part beside the list, level with it, instead of on to the next or the
       # last line; with none there, nothing happens. With :leave_ends UP on its first line goes to the
@@ -60,16 +61,7 @@ module Mod_Framework
       # The parts after a list of whole rows in its column keep to the column's bottom edge, the rest
       # of the room left between the list and them, so a part docked at the bottom stays there.
       #
-      # A :filter shows only the rows that hold its text, in any case: a row's :search (a text, or a
-      # block asked once for it), else its text or its item's name; a row with :search => false, such
-      # as a Remove row, is no entry: a text leaves it out, and :only keeps it unasked. :only (a block
-      # of a row, nil for none) also keeps only the rows it answers true for, such as those the chips
-      # over the list allow, and every block narrow gave keeps only the rows it answers true for, so
-      # several parts filter one list together. When no row a search can find is left it shows
-      # :no_match_text after the rows kept, and with no rows at all :empty_text, in a dim row that
-      # takes no pick. A new filter shows the rows from the first, the cursor on the first row a search
-      # can find; with :keep_cursor the cursor stays on its row while that still shows, else goes to
-      # the nearest row shown, the next one down first. Its index and row_at count the rows shown.
+      # With no rows at all it shows :empty_text in a dim row that takes no pick.
       # :label_width and :note_at take pixels, or texts of which the widest sets the column, the notes'
       # after the room before a row's text. A :note ends NOTE_GAP before the row's right text. A :note or :right may be an Array of parts,
       # each {:text, :icon, :icon_file, :color}, drawn in order: its icon (any icon Canvas#icon
@@ -90,7 +82,7 @@ module Mod_Framework
       # A row's :toggles are small on/off buttons at its right end, each {:text, :color, :on,
       # :tooltip}, outlined while off and filled while on, which a heading's :toggle_titles titles;
       # RIGHT and LEFT move the cursor from the row's text onto its toggles and back, and confirm or a
-      # click on one tells toggle. set_row draws one row anew. With :describe a row of an :item shows
+      # click on one tells toggle. With :describe a row of an :item shows
       # the game's description of it as its tooltip; with :escapes the rows' texts draw the game's
       # text codes; with :round the cursor goes round at the ends on every press, and left unset a list
       # of the new UI layer goes round on a fresh press only; with :cells each row's :cells lie
@@ -141,9 +133,6 @@ module Mod_Framework
         # game's command windows keep it.
         INSET = 2
         GAME_INSET = 4
-
-        # The row shown when a filter leaves no row.
-        NO_MATCH_TEXT = "Nothing matches"
 
         # The least room a row's note keeps; with less it is left out.
         NOTE_ROOM = 32
@@ -230,13 +219,13 @@ module Mod_Framework
         # A cell drawn once: its picture, its tooltip, and where its value's arrows and its toggles lie.
         Cell = Struct.new(:bitmap, :tip, :value_spot, :toggle_spots)
 
-        # Tells the defaults of the options: no rows, the cursor on the first, no filter.
+        # Tells the defaults of the options: no rows, the cursor on the first.
         #
         # @return [Hash] The defaults.
         def self.defaults
-          super.merge(:rows => [], :rows_shown => nil, :label_width => nil, :index => 0, :follow_pointer => nil, :shoulder_pages => true, :filter => "",
-                      :only => nil, :no_match_text => NO_MATCH_TEXT, :empty_text => nil, :note_at => nil, :submit_to => nil, :most_rows => SHOWN,
-                      :keep_cursor => false, :columns => 1, :cell_gap => CELL_GAP, :reorder => false, :move_hotkeys => false, :leave_ends => false, :sides => false,
+          super.merge(:rows => [], :rows_shown => nil, :label_width => nil, :index => 0, :follow_pointer => nil, :shoulder_pages => true,
+                      :empty_text => nil, :note_at => nil, :submit_to => nil, :most_rows => SHOWN,
+                      :columns => 1, :cell_gap => CELL_GAP, :reorder => false, :move_hotkeys => false, :leave_ends => false, :sides => false,
                       :quiet => false, :row_height => nil, :leave_sides => false, :describe => false, :escapes => false, :round => nil, :cells => nil,
                       :click_picks => false, :share_room => false, :pages_beside => false, :highlight => nil)
         end
@@ -246,15 +235,15 @@ module Mod_Framework
         # @return [Hash{Symbol => Array<String>}] The properties by option.
         def self.node_keys
           shown = ["rows", "disabled_rows", "heading_rows", "value_rows", "toggle_rows", "row_groups", "measured", "index"]
-          super.merge(:rows => shown, :filter => shown, :only => shown, :no_match_text => shown, :empty_text => shown, :rows_shown => ["measured", "whole_rows", "shrink"],
+          super.merge(:rows => shown, :empty_text => shown, :rows_shown => ["measured", "whole_rows", "shrink"],
                       :label_width => ["measured"], :note_at => ["measured"], :most_rows => ["measured"], :columns => ["row_cells", "measured"], :row_height => ["row_height", "measured"],
                       :index => ["index"], :grow => ["grow", "measured"], :follow_pointer => ["follow_pointer"], :shoulder_pages => ["shoulder_pages"],
                       :reorder => ["reorder", "row_groups"], :move_hotkeys => ["move_hotkeys"], :leave_ends => ["leave_ends"], :leave_sides => ["leave_sides"], :sides => ["sides"], :quiet => ["quiet"],
                       :round => ["round"], :click_picks => ["click_picks"], :pages_beside => ["pages_beside"])
         end
 
-        options :rows, :rows_shown, :label_width, :index, :follow_pointer, :shoulder_pages, :filter, :only, :no_match_text, :empty_text, :note_at, :submit_to,
-                :most_rows, :keep_cursor, :columns, :cell_gap, :reorder, :move_hotkeys, :leave_ends, :sides, :quiet, :row_height, :leave_sides, :describe, :escapes, :round,
+        options :rows, :rows_shown, :label_width, :index, :follow_pointer, :shoulder_pages, :empty_text, :note_at, :submit_to,
+                :most_rows, :columns, :cell_gap, :reorder, :move_hotkeys, :leave_ends, :sides, :quiet, :row_height, :leave_sides, :describe, :escapes, :round,
                 :cells, :click_picks, :share_room, :pages_beside, :highlight
 
         # The option :describe keeps only its setter, as its reader would hide Component#describe,
@@ -265,8 +254,6 @@ module Mod_Framework
         #
         # @param options [Hash] Its options, see DEFAULTS and defaults.
         def initialize(options = {})
-          @narrows = {}
-          @narrowed = 0
           super
           @options[:index] = cursor_at(@options[:index])
           release_pictures
@@ -290,70 +277,14 @@ module Mod_Framework
           emit(:change, row_at(place), place >= 0 ? place : nil) unless place == index && row_at(place) == shown
         end
 
-        # Puts a row in the place of one shown and draws it anew, the cursor kept; when it is the
-        # cursor's row, it tells its change blocks.
-        #
-        # @param place [Integer] The row's place among those shown.
-        # @param row [Hash, String] The new row.
-        # @return [List] Itself.
-        def set_row(place, row)
-          old = row_at(place)
-          at = old && Array(@options[:rows]).index { |each| each.equal?(old) }
-          return self unless at
-
-          rows = @options[:rows].dup
-          rows[at] = row
-          @options[:rows] = rows
-          set_option(:rows, rows)
-          emit(:change, row_at(place), place) if place == @options[:index].to_i
-          self
-        end
-
-        # Shows only the rows that hold a text, the cursor on the first a search can find. When the
-        # cursor's row is no longer the same row, it tells its change blocks as a move does.
-        #
-        # @param value [String, nil] The text, empty or nil for every row.
-        def filter=(value)
-          text = value.to_s
-          refilter(:filter, text) unless text == @options[:filter].to_s
-        end
-
-        # Shows only the rows a block keeps, besides the filter's text, the cursor on the first a
-        # search can find. When the cursor's row is no longer the same row, it tells its change blocks
-        # as a move does.
-        #
-        # @param block [Proc, nil] The block of a row, answering whether it shows; nil for every row.
-        def only=(block)
-          refilter(:only, block) unless block.equal?(@options[:only])
-        end
-
         # Puts the cursor on a row, kept on its rows.
         #
-        # @param value [Integer, Symbol] The row's place, -1 for none, or :first_found for the first
-        #   row a search can find.
+        # @param value [Integer] The row's place, -1 for none.
         def index=(value)
           set_option(:index, cursor_at(value))
         end
 
-        # Shows only the rows a block keeps, besides the filter and :only, under a key of its own, so
-        # several parts filter one list together, each with its own block; the cursor goes on the first
-        # row a search can find. When the cursor's row is no longer the same row, it tells its change
-        # blocks as a move does. A row with :search => false stays unasked.
-        #
-        # @param key [Object] What narrows it, such as the chips that steer it.
-        # @param block [Proc, nil] The block of a row, answering whether it shows; nil drops the key's.
-        # @return [List] Itself.
-        def narrow(key, block)
-          return self if block.nil? && !@narrows.key?(key)
-
-          shown = row_at(@options[:index].to_i)
-          block.nil? ? @narrows.delete(key) : @narrows[key] = block
-          @narrowed += 1
-          refilter(:only, @options[:only], shown)
-          self
-        end
-
-        # Hands out a row the filter shows.
+        # Hands out a row.
         #
         # @param place [Integer, nil] Its place among them.
         # @return [Hash, String, nil] The row as given, nil for none.
@@ -361,21 +292,11 @@ module Mod_Framework
           place && place >= 0 ? shown_rows[place] : nil
         end
 
-        # Tells the rows the filter and :only show, every row while neither filters.
+        # Tells the rows it shows: every row given.
         #
         # @return [Array<Hash, String>] The rows as given.
         def shown_rows
-          rows = @options[:rows]
-          word = @options[:filter].to_s.downcase
-          only = @options[:only]
-          same_rows = @shown && @shown[0].equal?(rows)
-          return @shown[3] if same_rows && @shown[1] == word && @shown[2].equal?(only) && @shown[4] == @narrowed
-
-          @searched = {} unless same_rows
-          all = Array(rows)
-          kept = word.empty? && only.nil? && @narrows.empty? ? all : headed(all.select { |row| heading?(row) || kept?(row, word, only) })
-          @shown = [rows, word, only, kept, @narrowed]
-          @shown[3]
+          Array(@options[:rows])
         end
 
         # Tells whether a row is a heading: a row of :heading, which heads the rows under it and is no
@@ -437,16 +358,16 @@ module Mod_Framework
         # Starts Move mode: it carries a row, which UP and DOWN, Page Up and Down and the pointer move
         # to another place, among the rows of its :group when it has one, a key past the group's first
         # or last row playing the buzzer; confirm or a click drops it
-        # there and cancel puts it back, either telling moved. It takes the focus. Setting rows or a
-        # filter ends Move mode without telling moved.
+        # there and cancel puts it back, either telling moved. It takes the focus. Setting rows ends Move
+        # mode without telling moved.
         #
         # @param place [Integer, nil] The row's place, nil for the cursor's.
-        # @return [Boolean] Whether it carries the row; false for no row, a row that takes no pick,
-        #   while a filter hides rows and while it takes no input.
+        # @return [Boolean] Whether it carries the row; false for no row, a row that takes no pick and
+        #   while it takes no input.
         def start_move(place = nil)
           place = place.nil? ? @options[:index].to_i : place.to_i
           row = row_at(place)
-          return false if row.nil? || heading?(row) || refuses?(row) || filtering? || !enabled_here?
+          return false if row.nil? || heading?(row) || refuses?(row) || !enabled_here?
 
           @moving = [row, place, @options[:rows]]
           @options[:index] = place
@@ -490,11 +411,10 @@ module Mod_Framework
         #
         # @param from [Integer] The row's place.
         # @param to [Integer] Its new place.
-        # @return [Boolean] Whether the row moved; false for no row, in Move mode and while a filter
-        #   hides rows.
+        # @return [Boolean] Whether the row moved; false for no row and in Move mode.
         def move_to(from, to)
           row = row_at(from)
-          return false if row.nil? || row_at(to).nil? || from == to || @moving || filtering?
+          return false if row.nil? || row_at(to).nil? || from == to || @moving
 
           rows = @options[:rows].dup
           rows.delete_at(from)
@@ -510,12 +430,12 @@ module Mod_Framework
         # row of none, the cursor with it, and tells moved. It works outside Move mode.
         #
         # @param step [Integer] -1 for up, 1 for down.
-        # @return [Boolean] Whether the row moved; false at its group's end, for no row, in Move mode,
-        #   while a filter hides rows and while it takes no input.
+        # @return [Boolean] Whether the row moved; false at its group's end, for no row, in Move mode
+        #   and while it takes no input.
         def move_row(step)
           from = @options[:index].to_i
           row = row_at(from)
-          return false if step.to_i == 0 || row.nil? || heading?(row) || @moving || filtering? || !enabled_here?
+          return false if step.to_i == 0 || row.nil? || heading?(row) || @moving || !enabled_here?
 
           rows = @options[:rows].dup
           first, last = group_span(rows, row)
@@ -1240,10 +1160,10 @@ module Mod_Framework
 
         # Tells where the cursor goes for an index given.
         #
-        # @param value [Integer, Symbol] The row's place, -1 for none, or :first_found.
-        # @return [Integer] The place kept on the rows shown.
+        # @param value [Integer] The row's place, -1 for none.
+        # @return [Integer] The place kept on the rows.
         def cursor_at(value)
-          value == :first_found ? first_found : kept_index(value.to_i, shown_rows.size)
+          kept_index(value.to_i, shown_rows.size)
         end
 
         # Moves the focus to :submit_to after a pick.
@@ -1261,8 +1181,8 @@ module Mod_Framework
         end
 
         # Tells the room of the labels' column: the pixels :label_width gives, else the widest of its
-        # texts or of the labels of all rows, shown or not, so a filter never moves the column, with
-        # the gap after a label.
+        # texts, which the layer's filter: gives as the labels of all items so the column never
+        # moves, or of the labels of its rows, with the gap after a label.
         #
         # @return [Integer] The pixels, 0 when no row has a label.
         def label_room
@@ -1341,68 +1261,15 @@ module Mod_Framework
           nil
         end
 
-        # Keeps the heading rows of rows a filter kept only where a row under them was kept.
-        #
-        # @param rows [Array<Hash, String>] The rows kept, headings among them.
-        # @return [Array<Hash, String>] The rows without the headings that head no row.
-        def headed(rows)
-          rows.each_with_index.reject { |row, place| heading?(row) && (place + 1 >= rows.size || heading?(rows[place + 1])) }.map(&:first)
-        end
-
-        # Tells the rows it draws: those shown, then the dim row of :no_match_text when something
-        # filters and no row a search can find is left, or of :empty_text when it has no rows at all,
-        # unless that text is nil.
+        # Tells the rows it draws: its rows, or with no rows at all the dim row of :empty_text, unless
+        # that text is nil.
         #
         # @return [Array<Hash, String>] The rows.
         def drawn_rows
           shown = shown_rows
-          return shown if shown.any? { |row| findable?(row) } || (!shown.empty? && !filtering?)
+          return shown unless shown.empty? && @options[:empty_text]
 
-          text = Array(@options[:rows]).empty? ? @options[:empty_text] : @options[:no_match_text]
-          text.nil? ? shown : shown + [{ :text => text.to_s, :disabled => true, :color => :dim }]
-        end
-
-        # Tells whether its text or :only filters its rows.
-        #
-        # @return [Boolean] Whether one does.
-        def filtering?
-          !@options[:filter].to_s.empty? || !@options[:only].nil? || !@narrows.empty?
-        end
-
-        # Tells whether a search can find a row: any row but one with :search => false.
-        #
-        # @param row [Hash, String] The row.
-        # @return [Boolean] Whether it can.
-        def findable?(row)
-          !(row.is_a?(Hash) && row[:search] == false) && !heading?(row)
-        end
-
-        # Tells where the cursor goes once the filter changed: on the first row a search can find,
-        # else on the first row.
-        #
-        # @return [Integer] The place, -1 for no rows.
-        def first_found
-          rows = shown_rows
-          found = rows.index { |row| findable?(row) }
-          found || (rows.empty? ? -1 : 0)
-        end
-
-        # Changes what filters the rows, the cursor on the first row a search can find and the rows
-        # shown from the first, or with :keep_cursor the cursor kept on its row or the nearest, and
-        # tells the change blocks when the cursor's row is no longer the same row.
-        #
-        # @param name [Symbol] :filter or :only.
-        # @param value [String, Proc, nil] Its new value.
-        # @param shown [Hash, String, nil] The cursor's row before the change.
-        def refilter(name, value, shown = row_at(@options[:index].to_i))
-          abandon_move
-          index = @options[:index].to_i
-          @options[name] = value
-          place = @options[:keep_cursor] && shown ? kept_index(nearest(shown), shown_rows.size) : first_found
-          @options[:index] = place
-          set_option(name, value)
-          Tree.set(self, "scroll_top" => 0) unless @options[:keep_cursor]
-          emit(:change, row_at(place), place >= 0 ? place : nil) unless place == index && row_at(place) == shown
+          [{ :text => @options[:empty_text].to_s, :disabled => true, :color => :dim }]
         end
 
         # Moves the row it carries to a place, kept among the rows of the row's :group, and the
@@ -1478,62 +1345,12 @@ module Mod_Framework
           emit(:moved, row, from, from)
         end
 
-        # Ends Move mode without telling moved, for rows or a filter set while a row is carried.
+        # Ends Move mode without telling moved, for rows set while a row is carried.
         def abandon_move
           return unless @moving
 
           @moving = nil
           Tree.set(self, "moving" => false)
-        end
-
-        # Tells where a row shows now, else where the nearest row shows: the first shown that came
-        # after it among the rows given, else the last shown.
-        #
-        # @param row [Hash, String] The row.
-        # @return [Integer] Its place among the rows shown, -1 for none.
-        def nearest(row)
-          all = Array(@options[:rows])
-          from = all.index { |each| each.equal?(row) } || 0
-          shown = shown_rows
-          after = shown.index { |each| (all.index { |given| given.equal?(each) } || 0) >= from }
-          after || shown.size - 1
-        end
-
-        # Tells whether a row shows while something filters: it holds the filter's text, and :only and
-        # every block of narrow keep it; a row with :search => false shows while there is no text,
-        # whatever the blocks say.
-        #
-        # @param row [Hash, String] The row.
-        # @param word [String] The filter's text in lower case.
-        # @param only [Proc, nil] The block of :only, nil for none.
-        # @return [Boolean] Whether it shows.
-        def kept?(row, word, only)
-          return word.empty? unless findable?(row)
-
-          (word.empty? || filter_match?(row, word)) && (only.nil? || only.call(row)) && @narrows.values.all? { |block| block.call(row) } ? true : false
-        end
-
-        # Tells whether a row holds a filter's text.
-        #
-        # @param row [Hash, String] The row.
-        # @param word [String] The text in lower case.
-        # @return [Boolean] Whether it does.
-        def filter_match?(row, word)
-          text = searched_text(row)
-          text ? text.include?(word) : false
-        end
-
-        # Tells the text a filter looks through in a row; a block is asked once for the rows given.
-        #
-        # @param row [Hash, String] The row.
-        # @return [String, nil] The text in lower case, nil for a row no filter finds.
-        def searched_text(row)
-          return row.to_s.downcase unless row.is_a?(Hash)
-          return nil if row[:search] == false
-          return @searched[row.object_id] ||= row[:search].call.to_s.downcase if row[:search].respond_to?(:call)
-
-          text = row[:search] || row[:text] || (row[:item] && Game.item_name(row[:item]))
-          text.to_s.downcase
         end
 
         # Tells whether its parent stacks its children in a column, where growing hands out height.

@@ -2,6 +2,7 @@
 #  dropdown.rbx
 #
 #  Changelog:
+#      Paulinchen  2026-11-11: Removed the filter a steered list took from the entries that are on, which the layer turned off
 #      Paulinchen  2026-11-09: Let a select's padding replace the room around its text, the arrow's room staying
 #      Paulinchen  2026-11-07: Read a greyed entry from :disabled
 #      Paulinchen  2026-11-06: Removed the add_ helper of the dropdown, which nothing called
@@ -25,7 +26,7 @@ module Mod_Framework
       # A button that opens a menu of entries below itself, each turned on and off, such as the
       # filters of a list. Its text names how many entries are on, "Filter (2)" by :count_text, or
       # with :count_text nil the text of the first entry on, and an arrow at its right points down. The entries are Hashes of :text, :icon, :value (else the
-      # text), :disabled (true greys it out and keeps it off) and :group; with :multi any number of
+      # text) and :disabled (true greys it out and keeps it off); with :multi any number of
       # them are on, else one, which a pick turns on and closes the menu. :clear_text adds an entry
       # after the others that turns every one off; while one is on and the dropdown steers a list, it
       # tells how many rows show by :clear_count_text, "Clear · 2 shown".
@@ -39,11 +40,6 @@ module Mod_Framework
       # the cursor on or off, and cancel, the game's :button (such as :Z) or a press anywhere else
       # close it, the focus going back where it was. A click on the dropdown opens and closes it, and
       # open_menu opens it from a key with the focus in it.
-      #
-      # keeps? and steer judge values by the entries that are on, every one while none is: within a
-      # :group one of them must match, and every group with an entry on must, so favorites and types
-      # filter together. With :narrows false it steers a list without filtering it, for a list whose
-      # owner filters its rows itself.
       #
       # Events: change (values: those of the entries now on), open, close (of the menu).
       class Dropdown < Button
@@ -69,7 +65,7 @@ module Mod_Framework
         # @return [Hash] The defaults.
         def self.defaults
           super.merge(:items => [], :values => [], :multi => true, :columns => :auto, :most_rows => MOST_ROWS, :clear_text => nil,
-                      :count_text => COUNT_TEXT, :button => nil, :clear_count_text => CLEAR_COUNT_TEXT, :narrows => true)
+                      :count_text => COUNT_TEXT, :button => nil, :clear_count_text => CLEAR_COUNT_TEXT)
         end
 
         # Tells which properties of C#'s tree each option sets: the entries on change its text.
@@ -79,9 +75,9 @@ module Mod_Framework
           super.merge(:values => TextSized::PROPS, :items => TextSized::PROPS, :count_text => TextSized::PROPS)
         end
 
-        options :items, :multi, :columns, :most_rows, :clear_text, :count_text, :button, :clear_count_text, :narrows
+        options :items, :multi, :columns, :most_rows, :clear_text, :count_text, :button, :clear_count_text
 
-        # @return [List, nil] The list it filters, see steer.
+        # @return [List, nil] The list it steers, see steer.
         attr_reader :steered
 
         # Makes the dropdown, the entries on kept to those it has.
@@ -124,29 +120,13 @@ module Mod_Framework
           @options[:values].include?(value)
         end
 
-        # Tells whether something passes the entries that are on, see the class.
-        #
-        # @param values [Object, Array] Its value, or its values.
-        # @return [Boolean] Whether it passes.
-        def keeps?(values)
-          given = Array(values)
-          wanted = {}
-          @options[:values].each { |value| (wanted[group_of(value)] ||= []) << value }
-          wanted.values.all? { |group| !(group & given).empty? }
-        end
-
-        # Filters a list by the entries that are on from now on, as Chips#steer does; another list it
-        # steered is left unfiltered by it.
+        # Steers a list from now on: the menu lies at its left edge as wide as it, and the clear entry
+        # counts its rows, which its owner filters.
         #
         # @param list [List] The list.
-        # @yieldparam row [Hash, String] A row of the list.
-        # @yieldreturn [Object, Array] Its value or values the entries judge.
         # @return [Dropdown] Itself.
-        def steer(list, &values)
-          @steered.narrow(self, nil) if @steered && !@steered.equal?(list)
+        def steer(list)
           @steered = list.is_a?(List) ? list : nil
-          @steer_values = values
-          narrow_steered
           self
         end
 
@@ -276,14 +256,6 @@ module Mod_Framework
 
         private
 
-        # Follows a changed option: other entries on filter the list it steers anew.
-        #
-        # @param name [Symbol] The option.
-        def changed(name)
-          super
-          narrow_steered if [:values, :items].include?(name)
-        end
-
         # Tells the text C# measures: the one it shows.
         #
         # @return [String] The text.
@@ -303,24 +275,6 @@ module Mod_Framework
         # @return [Array<Integer>] Top, right, bottom and left.
         def fixed_room
           [0, ARROW + ARROW_GAP, 0, 0]
-        end
-
-        # Filters the list it steers by the entries that are on, every row while none is, unless
-        # :narrows is false, as for a list whose owner filters its rows itself.
-        def narrow_steered
-          return unless @steered && @options[:narrows]
-
-          values = @steer_values
-          @steered.narrow(self, @options[:values].empty? ? nil : lambda { |row| keeps?(values ? values.call(row) : row) })
-        end
-
-        # Tells the group of an entry's value.
-        #
-        # @param value [Object] The value.
-        # @return [Object, nil] Its :group, nil for none.
-        def group_of(value)
-          item = Array(@options[:items]).find { |each| each.is_a?(Hash) && each.key?(:value) && each[:value] == value }
-          item ? item[:group] : nil
         end
 
         # Keeps the values of entries that may be on, in the entries' order, one at most without

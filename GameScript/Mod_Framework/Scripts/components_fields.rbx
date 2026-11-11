@@ -2,6 +2,7 @@
 #  components_fields.rbx
 #
 #  Changelog:
+#      Paulinchen  2026-11-11: Removed the filter a steered list took from a text field's text, which nothing used
 #      Paulinchen  2026-11-09: Titled the letter pages of a text field by the caption of the nearest field it sits in
 #                            - Kept a text field's room at its sides in its padding, which its padding replaces
 #                            - Drew a text field's background and border in place of its well and frame, its frame lit while it types
@@ -21,9 +22,9 @@ module Mod_Framework
       # (takes_key?), and UI.typing? tells so; Enter, or a
       # key bound to confirm that it does not type, gives the text, Escape and the numpad's 0 leave the field. It keeps its text while another has the
       # focus. With no parent it is a root of its own, a field alone on the screen that leaves its
-      # focus on the numpad's 0, or closes with :closable. steer has its arrows and Enter drive a list,
-      # and with :filter its text filter the list's rows. A character :allowed refuses plays the
-      # buzzer, unless :buzz is false, such as for digits that are hotkeys of its window instead.
+      # focus on the numpad's 0, or closes with :closable. steer has its arrows and Enter drive a list.
+      # A character :allowed refuses plays the buzzer, unless :buzz is false, such as for digits
+      # that are hotkeys of its window instead.
       # With :leave_sides a field of one line hands the focus to the part beside it by RIGHT with the
       # caret at the end of its text and LEFT at its start, as a row of buttons walks; coming back,
       # the caret stands at the end.
@@ -203,7 +204,6 @@ module Mod_Framework
           @editor = nil
           @resting = false
           @steered = nil
-          @filters = false
           @held = {}
         end
 
@@ -215,7 +215,6 @@ module Mod_Framework
           @caret = nil
           @editor.edit(text, text.length) if @editor
           set_option(:text, text)
-          filter_steered
         end
 
         # Tells where typing goes on: the caret's place in the text.
@@ -271,19 +270,15 @@ module Mod_Framework
         end
 
         # Has its arrows, Page Up and Page Down move a list's cursor and its Enter pick the list's row
-        # while it has the focus, as a search field over a list does; nil stops it. With :filter its
-        # text is the list's filter from now on, see List.
+        # while it has the focus, as a search field over a list does; nil stops it.
         #
         # @param list [List, nil] The list.
-        # @param options [Hash] :filter (true to filter the list's rows by its text).
         # @return [TextField] Itself.
-        def steer(list, options = {})
+        def steer(list)
           @steered.steered_by = nil if @steered
           @steered_log = defined?(LogView) && list.is_a?(LogView) ? list : nil
           @steered = list.is_a?(List) ? list : nil
           @steered.steered_by = self if @steered
-          @filters = options[:filter] ? true : false
-          filter_steered
           @held = {}
           Tree.set(self, "keys" => claimed_keys)
           self
@@ -440,7 +435,6 @@ module Mod_Framework
           text = @editor.text.to_s
           if text != @options[:text]
             @options[:text] = text
-            filter_steered
             emit(:change, text)
           end
           redraw
@@ -448,11 +442,6 @@ module Mod_Framework
           Sound.play_buzzer if taken.outcomes.include?(:refused) && @options[:buzz]
           submit_text if taken.outcomes.include?(:enter)
           show_completions if @completions && !@completions.empty?
-        end
-
-        # Hands its text to the list it steers as the list's filter, with :filter.
-        def filter_steered
-          @steered.filter = @options[:text] if @steered && @filters
         end
 
         # Draws the field: its well in the theme's field color, framed brighter while it has the focus,

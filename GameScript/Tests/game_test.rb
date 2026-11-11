@@ -2,6 +2,7 @@
 #  game_test.rb
 #
 #  Changelog:
+#      Paulinchen  2026-11-11: Removed the check of the engine list's text filter, which is gone
 #      Paulinchen  2026-11-09: Covered a window showing an item's gem count, which renders again after a gem set
 #                            - Moved the gem changes, the equip writer and the gem tooltips to the test of the Equipment Window
 #                            - Walked the readers of UI::Equip over the sword with its ruby set against a worn blade
@@ -271,14 +272,5 @@ in_game_folder do
     check("a window showing the edge's gem count renders the new count after a gem set [before, after]", [before, count_label.call.text], ["2/3", "3/3"])
     shown.close
     $game_party = FakeParty.new({})
-
-    # The item list finds an item by its name.
-    $game_party = FakeParty.new(knife_item => 1, FakeWeapon.new("Venom", 1, :features => [poison]) => 1)
-    def $game_party.equip_items; all_items; end
-    found = ui::Engine::List.new(:rows => game.equip_rows(knight, 0), :filter => "poison")
-    by_effect = found.shown_rows.size
-    found.filter = "ven"
-    check("an item is found by its name, not by its effects", [by_effect, *found.shown_rows.map { |row| row[:item].name }], [0, "Venom"])
-    $game_party = nil
   end
 end

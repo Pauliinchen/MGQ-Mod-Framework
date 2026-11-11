@@ -2,6 +2,7 @@
 #  layer_list_test.rb
 #
 #  Changelog:
+#      Paulinchen  2026-11-11: Checked the labels' column against a filter: that hides the widest label
 #      Paulinchen  2026-11-10: Covered a step of a dim arrow, which tells on_refuse the herb and the step
 #                            - Covered a heading in a color given as [r, g, b] and a row that names no color
 #      Paulinchen  2026-11-09: Covered a filter that keeps some rows, a pick among them and the row that says none is left
@@ -153,7 +154,7 @@ in_game_folder do
 end
 
 # The party's members with their place as a label and their level as a note: the labels' column as
-# wide as the widest label of all members, also while a search hides that member; the notes after
+# wide as the widest label of all members, also while a filter: hides that member; the notes after
 # the widest name note_at: gives, and label_width: given as texts; last, races under a heading in a
 # color given as [r, g, b], and a row whose color is misspelt.
 in_game_folder do
@@ -167,11 +168,13 @@ in_game_folder do
         class Party < UI::Component
           state :note_at
           state :label_width
+          state :reserve_shown, true
 
           def render
             window "Party" do
-              list [%w(Leader Luka Lv12), %w(Reserve Alice Lv40), %w(Fighter Granberia Lv30)], id: :party, bind_index: :picked,
-                   row: ->(member) { { label: member[0], text: member[1], note: member[2] } }, note_at: note_at, label_width: label_width
+              list [%w(Leader Luka Lv12), %w(Reserve Alice Lv40), %w(Guard Granberia Lv30)], id: :party, bind_index: :picked,
+                   row: ->(member) { { label: member[0], text: member[1], note: member[2] } }, note_at: note_at, label_width: label_width,
+                   filter: ->(member) { reserve_shown || member[0] != "Reserve" }
             end
           end
         end
@@ -195,10 +198,10 @@ in_game_folder do
 
     lefts = draw.call
     check("the names start after the widest label and a gap", lefts["Luka"] - lefts["Leader"], widest.call(%w(Reserve)) + gap)
-    list.filter = "Luka"
+    party.reserve_shown = false
     lefts = draw.call
-    check("a search that hides the member with the widest label leaves the column", lefts["Luka"] - lefts["Leader"], widest.call(%w(Reserve)) + gap)
-    list.filter = ""
+    check("a filter: that hides the member with the widest label leaves the column", [lefts.key?("Alice"), lefts["Luka"] - lefts["Leader"]], [false, widest.call(%w(Reserve)) + gap])
+    party.reserve_shown = true
 
     party.note_at = %w(Granberia)
     lefts = draw.call

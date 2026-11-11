@@ -2,6 +2,7 @@
 #  options_list.rbx
 #
 #  Changelog:
+#      Paulinchen  2026-11-11: Stopped giving its list :keep_cursor, which only a filter read
 #      Paulinchen  2026-11-10: Showed a row's value anew once a mod changed it elsewhere, such as Interface Positions after a box moved
 #      Paulinchen  2026-11-07: Showed the Hotkeys caption only under a mod's other rows
 #                            - Listed each mod's hotkey rows after its other rows, under a small Hotkeys caption
@@ -256,7 +257,7 @@ module Mod_Framework
 
         # Makes the list, the help line and their wiring.
         def build
-          @list = add_list(:rows => [], :rows_shown => @options[:rows_shown], :grow => 1, :sides => true, :quiet => true, :keep_cursor => true,
+          @list = add_list(:rows => [], :rows_shown => @options[:rows_shown], :grow => 1, :sides => true, :quiet => true,
                            :empty_text => @options[:empty_text])
           if @options[:help_line] && !@options[:help_window]
             add_divider

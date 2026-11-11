@@ -4,6 +4,7 @@
 #  Changelog:
 #      Paulinchen  2026-11-11: Gave an alert its close mark by on_close: alone, without closeable:
 #                            - Counted a list's lines of cards by most_rows: or rows_shown:, without lines_shown:
+#                            - Sized the labels' column of a list with filter: by the labels of all items, so the filter never moves it
 #      Paulinchen  2026-11-10: Told a list's on_refuse the item and the step of a dim arrow Left or Right pressed
 #      Paulinchen  2026-11-09: Gave an image scale: :auto, which scales it to its room at any factor keeping its proportions, and sampling:
 #                            - Passed padding_shrinks: on to every part
@@ -594,6 +595,18 @@ module Mod_Framework
           return kept if found || !left_out || params[:no_match].nil?
 
           kept + [{ :text => params[:no_match].to_s, :color => :dim, :faint => true, :disabled => true, :search => false }]
+        end
+
+        # Tells the labels of all a list's items, kept or not, which size the labels' column of a list
+        # with filter:, so the filter never moves it.
+        #
+        # @param params [Hash] The list's params.
+        # @return [Array<String, nil>] The labels, nil for an item without one.
+        def self.list_labels(params)
+          Array(params[:items]).map do |item|
+            row = list_row(params, item)
+            row[:label] if row.is_a?(Hash)
+          end
         end
 
         # Turns a list's items into the engine's rows: a heading row's text becomes its heading, a
@@ -1502,7 +1515,7 @@ module Mod_Framework
                               multi = params[:multi] == true
                               options = common(params).merge(:text => params[:placeholder].to_s, :multi => multi, :count_text => multi ? Dropdown::COUNT_TEXT : nil,
                                                              :columns => params[:columns] || :auto, :most_rows => params[:most_rows] || 8, :acts => true,
-                                                             :narrows => false, :button => params[:button] && params[:button].to_s.upcase.to_sym)
+                                                             :button => params[:button] && params[:button].to_s.upcase.to_sym)
                               options[:clear_text] = params[:clear_text].to_s if params[:clear_text]
                               options
                             end,
@@ -1612,7 +1625,8 @@ module Mod_Framework
                               options[:cell_gap] = spacing(params[:spacing]) if params[:spacing]
                               options[:empty_text] = params[:empty].to_s if params[:empty]
                               options[:note_at] = params[:note_at] if params[:note_at]
-                              options[:label_width] = params[:label_width] if params[:label_width]
+                              labels = params[:label_width] || (list_labels(params) if params[:filter])
+                              options[:label_width] = labels if labels
                               options[:cells] = Array(params[:cells]) if params[:cells]
                               options[:row_height] = Theme.rows[1] if params[:dense]
                               options[:row_height] = lined_height(rows) if !cards && rows.any? { |row| lined_row?(row) }

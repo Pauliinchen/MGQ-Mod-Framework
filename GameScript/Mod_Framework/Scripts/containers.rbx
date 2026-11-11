@@ -2,6 +2,7 @@
 #  containers.rbx
 #
 #  Changelog:
+#      Paulinchen  2026-11-11: Removed add_page, which nothing called
 #      Paulinchen  2026-11-09: Let a grid hand the focus on past its first and last lines
 #                            - Added CenteredColumn, a column in the middle of its room at a most width with gutters at its sides
 #      Paulinchen  2026-11-07: Added GridItem, a column that spans columns of a grid
@@ -343,8 +344,8 @@ module Mod_Framework
       # view, else slide a page that way, and cancel while the focus is inside it slides a page back
       # before it reaches the root, unless :cancel_back is false, the first page is in view or the
       # focus is on the part its root opened on. A part on a page out of view that takes the focus,
-      # by focus or a list's :submit_to, slides its page into view first. Each page is a column
-      # add_page makes, or any component added.
+      # by focus or a list's :submit_to, slides its page into view first. Each page is any component
+      # added.
       #
       # Events: change (index, as a slide starts), done (index, as it lands), slide (index, before a
       # slide by the keys or cancel; a block that answers false refuses it with the buzzer).
@@ -405,14 +406,6 @@ module Mod_Framework
           child.layer! if child.parent.equal?(self)
           settle(false)
           child
-        end
-
-        # Adds a page that is a column.
-        #
-        # @param options [Hash] The column's options.
-        # @return [Stack] The page.
-        def add_page(options = {})
-          add(Stack.new({ :layout => :column }.merge(options)))
         end
 
         # Hands out the pages in their order.
