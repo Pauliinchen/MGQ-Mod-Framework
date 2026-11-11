@@ -2,6 +2,9 @@
 #  collector.rbx
 #
 #  Changelog:
+#      Paulinchen  2026-11-12: Collected only behind a map change fade, since the game collects in every scene transition itself
+#      Paulinchen  2026-11-11: Collected behind a dark scene change only after the next scene started, and never at a battle start
+#                            - Collected behind a fade or a battle start once ten seconds passed since the last collection
 #      Paulinchen  2026-11-09: Had the DLL let the game's program use up to 4 GB once the game runs on the PC
 #                            - Collected and let go of pictures at once while the game runs low on memory, and let mods read the memory
 #                            - Collected at most once a minute and counted a collection the game ran since the last frame
@@ -12,18 +15,26 @@
 module Mod_Framework
   module UI
     module Engine
-      # Starts a garbage collection behind a scene change, while the screen stands still between two
-      # scenes, so the collections the game's heap needs come there rather than while a screen is used.
+      # Starts a garbage collection in the hold of a map change behind a fade once DUE seconds passed
+      # since the last collection, the game's own or the framework's. So the collections the game's
+      # heap needs come there rather than while the player walks.
       #
-      # A collection of a late-game heap takes about 220 ms, so one that ran less than GAP seconds
-      # before, the game's own or the framework's, makes the next scene change skip it; the game's
-      # own one may have run since the last frame, such as during the autosave of a menu's opening.
+      # A collection of a late-game heap takes about 220 ms, which a covered screen hides, while a
+      # menu or any screen that answers a key press on a visible frame would show it; a scene change,
+      # a battle start among them, needs none, since the game collects inside every scene transition
+      # itself and a second collection would only lengthen that hold.
       module Collector
-        # The seconds after a collection in which a scene change starts none.
-        GAP = 60
+        # The seconds after a collection, the game's own or the framework's, from which a covered
+        # moment collects.
+        #
+        # The game's own collection comes 20 to 26 seconds after one.
+        DUE = 10
 
-        # GC.count as the last frame ended, the last scene changed or the framework last collected;
-        # nil before the first reading.
+        # The tag the collector's hook registers under.
+        HOOK_TAG = "Mod Framework collector"
+
+        # GC.count as the last frame ended or the framework last collected; nil before the first
+        # reading.
         @count = nil
 
         # The time GC.count was last seen to change or the framework last collected; nil before
@@ -35,7 +46,8 @@ module Mod_Framework
         # What starts this script's lines in the log.
         LOG_TAG = "collector"
 
-        # Notes a collection the game ran. Called after every Graphics.update and as a scene changes.
+        # Notes a collection the game ran. Called after every Graphics.update and before a covered
+        # moment collects.
         def self.note_frame
           count = GC.count
           return if count == @count
@@ -44,30 +56,43 @@ module Mod_Framework
           @count = count
         end
 
-        # Collects behind a scene change unless a collection ran within GAP seconds or the game ends.
-        # Called after every scene's main ends, before the next scene starts.
+        # Collects and logs it once DUE seconds passed since the last collection, or none was seen.
         #
-        # @param scene [Object, nil] The scene that comes next, nil as the game ends.
+        # @param moment [String] What covers the screen, such as "the map change to map 51".
         # @return [Boolean] Whether it collected.
-        def self.scene_changed(scene)
-          return false if scene.nil?
-
+        def self.collect_if_due(moment)
           note_frame
           started = Time.now.to_f
-          return false if @collected_at && started - @collected_at < GAP
+          since = @collected_at ? started - @collected_at : nil
+          return false if since && since < DUE
 
           GC.start
           @collected_at = Time.now.to_f
           @count = GC.count
-          log(format("collected behind the change to %s in %.0f ms", scene.class.name, (@collected_at - started) * 1000.0))
+          last = since ? format("%.0f s after the last collection", since) : "the first collection seen"
+          log(format("collected at %s in %.0f ms, %s", moment, (@collected_at - started) * 1000.0, last))
           true
         end
 
-        # Follows the scenes once the game runs: a collection after each scene's main.
-        def self.install
-          return unless defined?(::Scene_Base) && ::Scene_Base.method_defined?(:main)
+        # Collects in the hold of a map change while a fade covers the screen. Called before
+        # Scene_Map#post_transfer, after the player moved.
+        #
+        # @return [Boolean] Whether it collected.
+        def self.transferred
+          fade = $game_temp.fade_type
+          # The white fade and an event's fadeout lie below the framework's windows, so a text field
+          # being typed into would show the stop.
+          covered = fade == 0 || ((fade == 1 || $game_map.screen.brightness == 0) && !UI.typing?)
+          return false unless covered
 
-          Hooks.after(::Scene_Base, :main, "Mod Framework collector") { Mod_Framework::UI::Engine::Collector.scene_changed(::SceneManager.scene) }
+          collect_if_due("the map change to map #{$game_map.map_id}")
+        end
+
+        # Follows the map changes once the game runs.
+        def self.install
+          return unless defined?(::Scene_Map) && (::Scene_Map.method_defined?(:post_transfer) || ::Scene_Map.private_method_defined?(:post_transfer))
+
+          Hooks.before(::Scene_Map, :post_transfer, HOOK_TAG) { Mod_Framework::UI::Engine::Collector.transferred }
         end
       end
 
@@ -127,7 +152,7 @@ module Mod_Framework
       end
     end
 
-    # Once the game runs, a scene change starts a garbage collection.
+    # Once the game runs, the collector follows the map changes.
     Run.on_start("collector") { Mod_Framework::UI::Engine::Collector.install }
   end
 
