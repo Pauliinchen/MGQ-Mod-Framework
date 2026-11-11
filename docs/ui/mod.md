@@ -176,7 +176,7 @@ set on its page of the website. Tell your players there that it needs the Mod Fr
 ## Versions and platforms
 
 - `Mod_Framework.at_least?("0.1.0")` tells whether the installed framework is that version or newer.
-  Within 0.x the framework only adds; the first change that breaks a mod will be 1.0.0.
+  Within 0.x a release may change a call; its release notes say what changed and how to adapt.
 - `Mod_Framework.available?` is false when the DLL is missing or refused, such as under Wine without
   it. Then no window opens (each open is refused, with a line in the log), and hotkeys and typing
   do nothing; your mod keeps running and nothing raises.

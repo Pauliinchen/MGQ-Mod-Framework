@@ -65,7 +65,7 @@ bash Android/build.sh check <zip>      # check a zip built before
 3. The *Release* workflow (`.github/workflows/release.yml`) takes the Equipment Window from the Mod Collection's latest release into `Bundled/`, fails while no `equipment-window` version on the website holds it, runs the script tests, publishes at that version, runs the C# tests against the published DLL and attaches `MGQ-Mod-Framework-0.1.0.zip`; then `Android/build.sh` on Linux attaches the Android zip. Keep the zip names: the website takes a zip whose name says android as the package for Android. If the run failed, fix the cause, then run it by hand from **Actions → Release** with the release's tag.
 4. Import the release on the website as a new version of the mod `mod-framework`, which the framework updates itself from.
 
-Before a release, check the hooks against the newest translation. Within 0.x the Ruby API and the bridge topics only grow; the first change that breaks a mod is 1.0.0.
+Before a release, check the hooks against the newest translation. Within 0.x a release may change the Ruby API and the bridge topics, never their conventions; its notes name each change and how a mod adapts, and the Mod Collection and MGQ Online change in the same release.
 
 ### Logs
 

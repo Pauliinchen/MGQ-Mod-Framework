@@ -114,8 +114,7 @@ end
 
 - **Params are read-only.** `self.actor = x` raises; keep a copy in a state, `state(:shown) { actor }`.
 - **State is written with `self.name = value`**, which renders the component again at the end of the
-  frame. `notes = x` without `self.` makes a local variable, and the log hints at that line as the
-  mod loads.
+  frame. `notes = x` without `self.` makes a local variable.
 - **State values are frozen.** `notes << x` raises; write `self.notes = notes + [x]`.
 - **A default is a plain value** (a number, a Symbol, nil, true, false or a text). A list or a Hash
   takes a block, `state(:notes) { [] }`, so components never share one.
@@ -147,7 +146,7 @@ game data it read changed. The framework sees the game data you read through `UI
 | `UI::Game.variable(id)`, `switch(id)` | that variable or switch changes |
 | `UI::Game.map_name`, `map_id` | the map changes |
 
-Reading `$game_party.gold` directly records nothing, and the log hints at such a line in `render`.
+Reading `$game_party.gold` directly records nothing.
 For data the framework cannot see, such as your own mod's, declare a `watch`:
 
 ```ruby

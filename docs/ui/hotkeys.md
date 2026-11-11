@@ -110,8 +110,9 @@ the key help, "D: Filter".
 
 ## Outside the framework's parts
 
-- `UI.typing?` tells whether the player types into a text field of any mod now; meanwhile the
-  hotkeys of every mod stay quiet.
+- `UI.typing?` tells whether the player types into a text field of any mod now; meanwhile every
+  hotkey defined through `Mod_Framework::Hotkeys` stays quiet. A mod that reads keys itself, such
+  as through GetAsyncKeyState, skips them while `UI.typing?` is true.
 - `UI.cancel?` tells whether the player cancelled in this frame by the keys every window takes, for
   a sprite of your own.
 - Hints name the keys as the player bound them: `UI.close_hint` gives "X or Numpad 0: close" and
