@@ -2,6 +2,8 @@
 //  ModMergeTests.cs
 //
 //  Changelog:
+//      Paulinchen  2026-11-11: Covered a mod that owns its whole package and the packages left out for the loader, the
+//                              framework's files or more than one mod
 //      Paulinchen  2026-11-07: Dropped the source of a mod, which is always the website
 //                            - Took a mod of no name as the example of a folder
 //      Paulinchen  2026-11-06: Covered the website as the only source of mods
@@ -43,8 +45,7 @@ public sealed class ModMergeTests
 
     /// <summary>
     /// Asserts that each mod of the website is a mod of its own, named after its script, that tells
-    /// its notes as plain lines, and that two mods stay two when both ship a README of the same name,
-    /// which neither installs, since only a mod's own script and folder go into Patch.
+    /// its notes as plain lines, and that two mods stay two when both ship a README of the same name.
     /// </summary>
     [Fact]
     public void Merge_MakesEachModOfTheWebsite()
@@ -58,13 +59,15 @@ public sealed class ModMergeTests
         Assert.Equal("site:party-sheet", mod.Id);
         Assert.Equal(["1.5.2"], mod.Known.Select(version => version.Version));
         Assert.Equal(["Fixes", "- Fixed the sheet.", "- Added a page."], mod.Notes);
-        Assert.All(mods, mod => Assert.DoesNotContain("README.md", mod.Install.Files.Keys));
     }
 
     /// <summary>
-    /// Asserts that a mod is named after its script with a folder of its name, else its only script,
-    /// else its folder, and that a mod with a file outside Patch or a name no file takes is never
-    /// offered.
+    /// Asserts that a mod owns every file its package puts into Patch, laid out as in Patch or under
+    /// a Patch folder whatever lies beside it, named after its script with a folder of its name, else
+    /// its only script, else its folder of scripts, and a package without scripts after its folder;
+    /// and that a mod is never offered whose package leaves Patch, writes the game's loader or the
+    /// framework's files, under the framework's name too unless it is the framework's own slug, gives
+    /// the loader two mods, or whose name no file takes.
     /// </summary>
     [Fact]
     public void Merge_NamesEachModAndLeavesOutWhatWouldEscape()
@@ -72,16 +75,24 @@ public sealed class ModMergeTests
         var site = new List<SiteMod>
         {
             SiteScript("level-cap", "Level Cap", "Level_Cap.rb", "1.5.2", Script),
-            SiteUpload("luka-replacer", "Luka Replacer", new() { ["Patch/Luka_Replacer.rb"] = Script, ["Patch/Luka_Replacer/Heroes/a.luka"] = OldScript }),
+            SiteUpload("luka-replacer", "Luka Replacer", new() { ["Patch/Luka_Replacer.rb"] = Script, ["Patch/Luka_Replacer/Heroes/a.luka"] = OldScript, ["Changelog.txt"] = OldScript }),
+            SiteUpload("bugfix", "Bugfix", new() { ["0_Bugfix.rb"] = Script, ["Bugfix/core.rbx"] = OldScript }),
+            SiteUpload("arena", "Arena", new() { ["Arena/arena.rb"] = Script }),
             SiteUpload("heroes", "Heroes", new() { ["Heroes/a.luka"] = OldScript }),
             SiteUpload("online", "Online", new() { ["0_Config.rb"] = OldScript, ["Arena.rb"] = Script, ["Arena/data.txt"] = OldScript }),
             SiteUpload("escape", "Escape", new() { ["../Game.exe"] = Script }),
+            SiteUpload("loader", "Loader", new() { ["Loader.rb"] = Script, ["patch.rb"] = OldScript }),
+            SiteUpload("evil", "Evil", new() { ["Evil.rb"] = Script, ["Mod_Framework/evil.rbx"] = OldScript }),
+            SiteUpload("modframework", "ModFramework", new() { ["Patch/ModFramework.rb"] = Script, ["Patch/mod_framework/x.rbx"] = OldScript }),
             SiteScript("device", "Device", "CON.rb", "1", Script),
         };
 
-        var mods = ModMerge.Merge(site).ToDictionary(mod => mod.Id, mod => mod.Folder);
+        var merged = ModMerge.Merge(site);
 
-        Assert.Equal(new Dictionary<string, string> { ["site:level-cap"] = "Level_Cap", ["site:luka-replacer"] = "Luka_Replacer", ["site:heroes"] = "Heroes", ["site:online"] = "Arena" }, mods);
+        Assert.Equal(new Dictionary<string, string> { ["site:level-cap"] = "Level_Cap", ["site:luka-replacer"] = "Luka_Replacer", ["site:bugfix"] = "0_Bugfix", ["site:arena"] = "Arena", ["site:heroes"] = "Heroes" }, merged.ToDictionary(mod => mod.Id, mod => mod.Folder));
+        Assert.Equal(
+            ["0_Bugfix.rb", "Bugfix/core.rbx", "Luka_Replacer.rb", "Luka_Replacer/Heroes/a.luka"],
+            merged.Where(mod => mod.Id is "site:bugfix" or "site:luka-replacer").SelectMany(mod => mod.Install.Files.Keys).Order());
     }
 
     /// <summary>

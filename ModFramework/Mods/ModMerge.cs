@@ -2,6 +2,8 @@
 //  ModMerge.cs
 //
 //  Changelog:
+//      Paulinchen  2026-11-11: Gave a mod every file its package puts into Patch and named each version, and left out a
+//                              package that writes the loader or the framework or gives the loader more than one mod
 //      Paulinchen  2026-11-08: Named the framework's own script in the log of the files left out
 //      Paulinchen  2026-11-07: Used the bridge and the runtime under the framework's namespace
 //                            - Dropped the source of a mod, which is always the website
@@ -45,6 +47,11 @@ internal static partial class ModMerge
     public const int MaxNoteLength = 400;
 
     /// <summary>
+    /// The folder a package laid out like the game folder holds the files of Patch in.
+    /// </summary>
+    private const string GamePatch = "Patch/";
+
+    /// <summary>
     /// Makes the mods.
     /// </summary>
     /// <param name="site">The website's mods; <see langword="null"/> when the list could not be had.</param>
@@ -66,7 +73,7 @@ internal static partial class ModMerge
     /// platform the list was read for.
     /// </summary>
     /// <param name="mod">The mod.</param>
-    /// <returns>The entry; <see langword="null"/> for a mod without such a version, or a package that is neither a script nor a zip.</returns>
+    /// <returns>The entry; <see langword="null"/> for a mod without such a version, a package that is neither a script nor a zip, or a version refused, see <see cref="FilesOf"/>.</returns>
     private static BrowsedMod? FromSite(SiteMod mod)
     {
         var id = $"site:{mod.Slug}";
@@ -80,8 +87,8 @@ internal static partial class ModMerge
         var latest = offered[0];
         var package = latest.Package!;
         var newer = mod.Versions.TakeWhile(version => version != latest).FirstOrDefault()?.Version ?? string.Empty;
-        var name = PatchFolder.NameOf(mod.Slug, InsidePatch(latest.Files));
-        var files = OwnFiles(id, name, InsidePatch(latest.Files), true);
+        var read = offered.Select((version, index) => FilesOf(mod.Slug, version.Files, latest: index == 0)).ToList();
+        var files = read[0].Files;
         var zip = package.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase);
         var script = package.Name.EndsWith(".rb", StringComparison.OrdinalIgnoreCase) && files.Count == 1;
 
@@ -91,10 +98,70 @@ internal static partial class ModMerge
             return null;
         }
 
-        var known = offered.Select(version => new ModVersion(version.Version, OwnFiles(id, name, InsidePatch(version.Files), false), version.Requires, version.Notes)).ToList();
+        if (read.Select(version => version.Refusal).FirstOrDefault(refusal => refusal != null) is { } refused)
+        {
+            Log.Write($"mod browser leaves out {id}: {refused}");
+            return null;
+        }
+
+        if (read[0].LeftOut.Count > 0)
+        {
+            var why = mod.Slug == PatchFolder.FrameworkSlug ? $"the framework's package installs only {PatchFolder.FrameworkEntry} and the folder {PatchFolder.FrameworkFolder}" : "they lie outside its Patch folder";
+            Log.Write($"mod browser leaves {string.Join(", ", read[0].LeftOut)} of {id} out: {why}");
+        }
+
+        var known = offered.Select((version, index) => new ModVersion(version.Version, PatchFolder.NameOf(mod.Slug, read[index].Files), read[index].Files, version.Requires, version.Notes)).ToList();
         var install = new CatalogMod(id, mod.Name, latest.Version, files, known.Skip(1).ToList(), package.Url, Archive: zip, Tag: mod.Tag, Requires: latest.Requires);
         var notes = MarkdownText.Lines(latest.Changelog, MaxNotes, MaxNoteLength);
-        return new BrowsedMod(id, mod.Name, mod.Author, mod.Page, mod.Summary, notes, package.Size, install, name, package.Sha256, known, mod.Thumbnail, mod.Tag, offered.Select(version => version.Version).ToList(), newer, mod.Meta ?? SiteMeta.None);
+        return new BrowsedMod(id, mod.Name, mod.Author, mod.Page, mod.Summary, notes, package.Size, install, known[0].Name, package.Sha256, known, mod.Thumbnail, mod.Tag, offered.Select(version => version.Version).ToList(), newer, mod.Meta ?? SiteMeta.None);
+    }
+
+    /// <summary>
+    /// Reads the files a version of a website's mod puts into Patch: every file of its package, or,
+    /// when the package is laid out like the game folder, every file under its Patch folder; the
+    /// framework's package puts only its own files there.
+    /// </summary>
+    /// <remarks>
+    /// The website checks an upload with this too, so the author learns at once what the framework would leave out.
+    /// </remarks>
+    /// <param name="slug">The mod's slug on the website; only <see cref="PatchFolder.FrameworkSlug"/> may ship the framework's files.</param>
+    /// <param name="listed">Each file's hash by its path in the package.</param>
+    /// <param name="latest">Whether it is the version offered, which may give the loader no more than one mod, named as <see cref="PatchFolder.NameOf"/> names it.</param>
+    /// <returns>Each file's hash by its path inside Patch, the paths of the package left out, and why the version may not be installed; <see langword="null"/> when it may.</returns>
+    internal static (Dictionary<string, string> Files, List<string> LeftOut, string? Refusal) FilesOf(string slug, IReadOnlyDictionary<string, string> listed, bool latest = true)
+    {
+        var framework = slug == PatchFolder.FrameworkSlug;
+        var laidOut = listed.Keys.Any(path => path.Replace('\\', '/').StartsWith(GamePatch, StringComparison.OrdinalIgnoreCase));
+        var files = new Dictionary<string, string>(StringComparer.Ordinal);
+        var leftOut = new List<string>();
+        string? refusal = null;
+
+        foreach (var (path, hash) in listed)
+        {
+            var slashed = path.Replace('\\', '/');
+            var inside = !laidOut ? slashed : slashed.StartsWith(GamePatch, StringComparison.OrdinalIgnoreCase) ? slashed[GamePatch.Length..] : null;
+
+            if (inside == null || (framework && !PatchFolder.IsFrameworkFile(inside)))
+            {
+                leftOut.Add(path);
+                continue;
+            }
+
+            files[inside] = hash;
+            refusal ??= PatchFolder.RefusalOf(inside, framework) is { } why ? $"the file {path} {why}" : null;
+        }
+
+        if (refusal == null && latest && !framework)
+        {
+            var rows = PatchFolder.RowsOf(files.Keys);
+
+            if (rows.Count > 1 || (rows.Count == 1 && !string.Equals(rows[0], PatchFolder.NameOf(slug, files), StringComparison.OrdinalIgnoreCase)))
+            {
+                refusal = $"a package must be one mod, and this one gives the loader {string.Join(" and ", rows)}";
+            }
+        }
+
+        return (files, leftOut, refusal);
     }
 
     /// <summary>
@@ -109,7 +176,7 @@ internal static partial class ModMerge
     /// Tells whether the mod browser may offer an entry, and logs why not.
     /// </summary>
     /// <param name="mod">The entry.</param>
-    /// <returns>Whether it has files, none of them outside Patch in any known version, and a name a mod in Patch takes.</returns>
+    /// <returns>Whether it has files and a name a mod in Patch takes.</returns>
     private static bool Offered(BrowsedMod mod)
     {
         if (mod.Install.Files.Count == 0)
@@ -124,69 +191,7 @@ internal static partial class ModMerge
             return false;
         }
 
-        foreach (var path in mod.Known.SelectMany(version => version.Files.Keys))
-        {
-            if (RefusalOf(path) is { } why)
-            {
-                Log.Write($"mod browser leaves out {mod.Id}: its file {path} {why}");
-                return false;
-            }
-        }
-
         return true;
-    }
-
-    /// <summary>
-    /// Tells why a path inside Patch may not be written.
-    /// </summary>
-    /// <param name="path">The path inside Patch, with forward slashes.</param>
-    /// <returns>Why not, for the log; <see langword="null"/> when it may.</returns>
-    internal static string? RefusalOf(string path) =>
-        path.Contains(':', StringComparison.Ordinal) || path.Split('/').Any(part => part.Length == 0 || part.Trim().Trim('.').Length == 0)
-            ? "would land outside the Patch folder"
-            : null;
-
-    /// <summary>
-    /// Keeps the files of a mod's own script and folder, since only those go into Patch; a path that
-    /// would leave Patch stays, so the mod is refused.
-    /// </summary>
-    /// <remarks>
-    /// A package may bring the first copy of another mod, which owns its updates, so every install,
-    /// update, removal and check of the installed version sees only these files.
-    /// </remarks>
-    /// <param name="id">The mod's id, for the log.</param>
-    /// <param name="name">The mod's name in Patch.</param>
-    /// <param name="files">Each file's hash by its path inside Patch.</param>
-    /// <param name="logged">Whether the files left out are logged.</param>
-    /// <returns>The files kept.</returns>
-    private static Dictionary<string, string> OwnFiles(string id, string name, Dictionary<string, string> files, bool logged)
-    {
-        var own = files.Where(file => PatchFolder.Owns(name, file.Key) || RefusalOf(file.Key) != null).ToDictionary(file => file.Key, file => file.Value, StringComparer.Ordinal);
-
-        if (logged && own.Count < files.Count)
-        {
-            var script = name == PatchFolder.FrameworkFolder ? PatchFolder.FrameworkEntry : name + PatchFolder.Script;
-            Log.Write($"mod browser leaves {string.Join(", ", files.Keys.Where(path => !own.ContainsKey(path)))} of {id} out: only {script} and the folder {name} are its own");
-        }
-
-        return own;
-    }
-
-    /// <summary>
-    /// Reads files' paths as their paths inside Patch.
-    /// </summary>
-    /// <param name="files">Each file's hash by its path as a source names it.</param>
-    /// <returns>Each file's hash by its path inside Patch.</returns>
-    private static Dictionary<string, string> InsidePatch(IReadOnlyDictionary<string, string> files)
-    {
-        var inside = new Dictionary<string, string>(StringComparer.Ordinal);
-
-        foreach (var (path, hash) in files)
-        {
-            inside[ModInstaller.PathInsidePatch(path)] = hash;
-        }
-
-        return inside;
     }
 
     /// <summary>

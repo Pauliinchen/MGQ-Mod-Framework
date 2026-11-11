@@ -2,6 +2,7 @@
 //  CatalogMod.cs
 //
 //  Changelog:
+//      Paulinchen  2026-11-11: Named each version as the loader names it
 //      Paulinchen  2026-11-07: Dropped the kind of an entry, which only the cut sources set
 //      Paulinchen  2026-11-06: Removed the relay's catalog and the GitHub releases as sources of mods; the website is the only one
 //      Paulinchen  2026-10-30: Carried what a version tells beside its files
@@ -30,7 +31,7 @@ namespace MGQParadox.ModFramework.Mods;
 /// <param name="Key">The mod's key: its name in lower case, without ".rb", spaces, underscores and hyphens.</param>
 /// <param name="Name">The mod's name.</param>
 /// <param name="Version">The current version.</param>
-/// <param name="Files">The current files' hashes: a script's by its name, a zip's by each file's path inside the mod's folder.</param>
+/// <param name="Files">The current files' hashes by their paths inside Patch.</param>
 /// <param name="Versions">The older versions the website keeps, newest first.</param>
 /// <param name="FileUrl">The address of its package on the website.</param>
 /// <param name="Archive">Whether its package is a zip of the mod's files, which go to their paths inside its folder, rather than a script.</param>
@@ -42,10 +43,11 @@ internal sealed record CatalogMod(string Key, string Name, string Version, IRead
 /// A version of a mod as the website lists it.
 /// </summary>
 /// <param name="Version">The version.</param>
-/// <param name="Files">Its files' hashes by their paths inside the mod's folder.</param>
+/// <param name="Name">Its name in Patch and Mods.ini, see <see cref="PatchFolder.NameOf"/>.</param>
+/// <param name="Files">Its files' hashes by their paths inside Patch.</param>
 /// <param name="Requires">What it needs; <see langword="null"/> for nothing.</param>
 /// <param name="Notes">What it tells beside its files, the website's save safety, conflicts and the rest; <see langword="null"/> for nothing.</param>
-internal sealed record ModVersion(string Version, IReadOnlyDictionary<string, string> Files, IReadOnlyList<ModRequirement>? Requires = null, VersionNotes? Notes = null);
+internal sealed record ModVersion(string Version, string Name, IReadOnlyDictionary<string, string> Files, IReadOnlyList<ModRequirement>? Requires = null, VersionNotes? Notes = null);
 
 /// <summary>
 /// A mod another mod needs, as the website found it at the upload.

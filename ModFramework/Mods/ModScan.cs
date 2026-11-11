@@ -2,7 +2,12 @@
 //  ModScan.cs
 //
 //  Changelog:
-//      Paulinchen  2026-11-11: Kept the hashes of each file read until its length or write time changes
+//      Paulinchen  2026-11-11: Left another mod's script that an older package carried out of the signs that a mod is installed
+//                            - Read a whole copy beside files only other versions list as an update in part
+//                            - Read a copy that misses files of a version or holds files of older ones as an update in part
+//                            - Removed every file any known version lists while it is still that version's
+//                            - Kept the hashes of each file read until its length or write time changes
+//                            - Removed every file of a mod's package but the loader and the framework's files
 //      Paulinchen  2026-11-09: Caught every error of the search for old DLLs
 //      Paulinchen  2026-11-07: Used the bridge and the runtime under the framework's namespace
 //      Paulinchen  2026-10-30: Moved into the Mod Framework as ModScan, from PatchScan
@@ -62,20 +67,79 @@ internal static class ModScan
 
         foreach (var mod in mods)
         {
-            var installed = mod.Known.FirstOrDefault(version => version.Files.All(file => FileAt(file.Key).Hashes is { } hashes && ModHash.Matches(hashes, file.Value)));
-            var state = installed != null
-                ? new ModState(ModMerge.CompareVersions(mod.Latest, installed.Version) > 0 ? ModStatus.Update : ModStatus.Current, installed)
-                : new ModState(mod.Known.SelectMany(version => version.Files.Keys).Any(path => FileAt(path).Exists) ? ModStatus.Changed : ModStatus.Available, null);
+            var state = StateOf(mod, path => FileAt(path).Exists, (path, hash) => FileAt(path).Hashes is { } hashes && ModHash.Matches(hashes, hash));
             states[mod.Id] = state;
 
             if (logged)
             {
-                Log.Write($"mod browser: {mod.Id} is {state.Status}{(installed != null ? $", {installed.Version} installed" : string.Empty)}, latest {mod.Latest}");
+                Log.Write($"mod browser: {mod.Id} is {state.Status}{(state.Installed is { } installed ? $", {installed.Version} installed{(state.Repair ? " in part" : string.Empty)}" : string.Empty)}, latest {mod.Latest}");
             }
         }
 
         return states;
     }
+
+    /// <summary>
+    /// Tells how a mod stands by the files of its known versions: the newest version whose files
+    /// are all there as listed is installed, in part while an own file another version lists at a
+    /// path it does not is there as listed; else an own file that matches no version listing it
+    /// makes a changed copy; else an own script makes an update in part, of the version with the
+    /// most files there; else any own file makes a changed copy. Own files are those of
+    /// <see cref="OwnFilesOf"/>.
+    /// </summary>
+    /// <remarks>
+    /// An update in part is rewritten whole by an update, while its version counts as unknown for
+    /// worlds and needs, since the game would not load what its files miss and would also run the
+    /// files another version left.
+    /// </remarks>
+    /// <param name="mod">The mod.</param>
+    /// <param name="exists">Tells whether a path inside Patch holds a file.</param>
+    /// <param name="matches">Tells whether the file at a path inside Patch is the one a hash names.</param>
+    /// <returns>Its state.</returns>
+    public static ModState StateOf(BrowsedMod mod, Func<string, bool> exists, Func<string, string, bool> matches)
+    {
+        if (mod.Known.FirstOrDefault(version => version.Files.Count > 0 && version.Files.All(file => matches(file.Key, file.Value))) is { } whole)
+        {
+            var own = new HashSet<string>(whole.Files.Keys, StringComparer.OrdinalIgnoreCase);
+
+            if (OwnFilesOf(mod).Any(file => !own.Contains(file.Key) && matches(file.Key, file.Value)))
+            {
+                return new ModState(ModStatus.Update, whole, Repair: true);
+            }
+
+            return new ModState(ModMerge.CompareVersions(mod.Latest, whole.Version) > 0 ? ModStatus.Update : ModStatus.Current, whole);
+        }
+
+        var present = OwnFilesOf(mod).GroupBy(file => file.Key, StringComparer.OrdinalIgnoreCase).Where(path => exists(path.Key)).ToList();
+
+        if (present.Any(path => !path.Any(file => matches(file.Key, file.Value))))
+        {
+            return new ModState(ModStatus.Changed, null);
+        }
+
+        if (present.Any(path => path.Key.EndsWith(PatchFolder.Script, StringComparison.OrdinalIgnoreCase)))
+        {
+            var most = mod.Known
+                .OrderByDescending(version => version.Files.Count(file => matches(file.Key, file.Value)))
+                .ThenByDescending(version => version.Version, Comparer<string>.Create(ModMerge.CompareVersions))
+                .First();
+            return new ModState(ModStatus.Update, most, Repair: true);
+        }
+
+        return new ModState(present.Count > 0 ? ModStatus.Changed : ModStatus.Available, null);
+    }
+
+    /// <summary>
+    /// Lists the files of each known version of a mod but the scripts that give the loader a mod
+    /// other than that version's own.
+    /// </summary>
+    /// <remarks>
+    /// An older package may carry another mod's script, which alone never shows that this mod is there.
+    /// </remarks>
+    /// <param name="mod">The mod.</param>
+    /// <returns>Each such file's path inside Patch and hash, once per version listing it.</returns>
+    private static IEnumerable<KeyValuePair<string, string>> OwnFilesOf(BrowsedMod mod) =>
+        mod.Known.SelectMany(version => version.Files.Where(file => PatchFolder.RowsOf([file.Key]).All(row => string.Equals(row, version.Name, StringComparison.OrdinalIgnoreCase))));
 
     /// <summary>
     /// Deletes the DLLs an install renamed out of the way in Patch, as far as the game no longer has them loaded.
@@ -114,8 +178,8 @@ internal static class ModScan
     }
 
     /// <summary>
-    /// Removes the files of a mod's installed version that are still exactly that version's and lie
-    /// in its own script or folder, then the folders inside Patch that leaves empty.
+    /// Removes an installed mod: every file any of its known versions lists that is still exactly a
+    /// known version's file at its path, then the folders inside Patch that leaves empty.
     /// </summary>
     /// <param name="mod">The mod.</param>
     /// <param name="state">How it stands, see <see cref="Detect"/>; nothing is removed when no version is installed.</param>
@@ -126,7 +190,7 @@ internal static class ModScan
         var removed = new List<string>();
         var failed = new List<string>();
 
-        if (state.Installed is not { } installed)
+        if (state.Installed == null)
         {
             return (removed, failed);
         }
@@ -134,11 +198,13 @@ internal static class ModScan
         var patch = PatchFolder.PathOf(gameFolder);
         var folders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-        foreach (var (path, hash) in installed.Files)
+        foreach (var listed in mod.Known.SelectMany(version => version.Files).GroupBy(file => file.Key, StringComparer.OrdinalIgnoreCase))
         {
-            if (!PatchFolder.Owns(mod.Folder, path))
+            var path = listed.Key;
+
+            if (PatchFolder.RefusalOf(path, ModInstaller.IsFramework(mod.Install)) is { } why)
             {
-                Log.Write($"kept {path} in Patch, which is not {mod.Name}'s own");
+                Log.Write($"kept {path} in Patch, which {why}");
                 continue;
             }
 
@@ -149,9 +215,11 @@ internal static class ModScan
                     continue;
                 }
 
-                if (!ModHash.Matches(path, File.ReadAllBytes(full), hash))
+                var hashes = ModHash.Hashes(path, File.ReadAllBytes(full));
+
+                if (!listed.Any(file => ModHash.Matches(hashes, file.Value)))
                 {
-                    Log.Write($"kept {path} in Patch, which differs from {mod.Name} {installed.Version}");
+                    Log.Write($"kept {path} in Patch, which differs from every version of {mod.Name} the website lists");
                     continue;
                 }
 

@@ -2,6 +2,8 @@
 //  ModInstallerTests.cs
 //
 //  Changelog:
+//      Paulinchen  2026-11-11: Covered an older version's renamed script removed by an update
+//                            - Dropped the refusal of a write outside a mod's own script and folder
 //      Paulinchen  2026-11-07: Covered the updates of mods that run, which wait for the next start
 //                            - Covered the deletion of the old DLL at the next session
 //                            - Built the mods without the cut kind of an entry
@@ -28,7 +30,7 @@ namespace MGQParadox.ModFramework.Tests.Mods;
 
 /// <summary>
 /// Covers installing and updating mods in the Patch folder, the framework's own update included, and
-/// the refusals that keep an install to the catalog's files in the mod's own script and folder.
+/// the refusals that keep an install to the catalog's files inside Patch, away from the game's loader.
 /// </summary>
 public sealed class ModInstallerTests
 {
@@ -75,8 +77,8 @@ public sealed class ModInstallerTests
     }
 
     /// <summary>
-    /// Asserts that a newer version removes the files only an older version shipped, as long as they
-    /// are that version's and lie in the mod's own places, and that a DLL the game has loaded, which
+    /// Asserts that a newer version removes the files only an older version shipped, its renamed
+    /// script too, as long as they are that version's, and that a DLL the game has loaded, which
     /// Windows lets be renamed but not overwritten, is renamed out of the way and deleted by the
     /// first fetch of the next game session.
     /// </summary>
@@ -99,14 +101,14 @@ public sealed class ModInstallerTests
             ["Foo/notes.txt"] = ModHash.Of("notes.txt", Encoding.UTF8.GetBytes("notes")),
             ["Foo_Core.rb"] = ModHash.Of("Foo_Core.rb", core),
         };
-        var mod = new CatalogMod("foo", "Foo", "2", current, [new ModVersion("2", current), new ModVersion("1", older)], string.Empty, Archive: true);
+        var mod = new CatalogMod("foo", "Foo", "2", current, [new ModVersion("2", "Foo", current), new ModVersion("1", "Foo", older)], string.Empty, Archive: true);
 
         using (new FileStream(dll, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete))
         {
             ModInstaller.Install([(mod, "Foo")], _ => Zip(("Foo.rb", Script), ("Foo/Foo.dll", library)), game.Path);
         }
 
-        Assert.Equal((true, false, true, true), (game.Has("Patch/Foo.rb"), game.Has("Patch/Foo/core.rb"), game.Has("Patch/Foo/notes.txt"), game.Has("Patch/Foo_Core.rb")));
+        Assert.Equal((true, false, true, false), (game.Has("Patch/Foo.rb"), game.Has("Patch/Foo/core.rb"), game.Has("Patch/Foo/notes.txt"), game.Has("Patch/Foo_Core.rb")));
         Assert.Equal(library, File.ReadAllBytes(dll));
         Assert.Equal("old library", File.ReadAllText(dll + ModInstaller.OldDllSuffix));
 
@@ -130,7 +132,7 @@ public sealed class ModInstallerTests
         game.Put("Patch/Foo/Foo.dll", Encoding.UTF8.GetBytes("old library"));
         var current = new Dictionary<string, string> { ["Foo.rb"] = ModHash.Of("Foo.rb", Script), ["Foo/Foo.dll"] = ModHash.Of("Foo.dll", library) };
         var older = new Dictionary<string, string> { ["Foo.rb"] = "aa", ["Foo/core.rb"] = ModHash.Of("core.rb", core) };
-        var foo = new CatalogMod("foo", "Foo", "2", current, [new ModVersion("2", current), new ModVersion("1", older)], string.Empty, Archive: true);
+        var foo = new CatalogMod("foo", "Foo", "2", current, [new ModVersion("2", "Foo", current), new ModVersion("1", "Foo", older)], string.Empty, Archive: true);
 
         var written = ModInstaller.Install([(foo, "Foo"), (LinkMod(ModHash.Of("Level_Cap.rb", Script)), "Level_Cap")], mod => mod.Archive ? Zip(("Foo.rb", Script), ("Foo/Foo.dll", library)) : Script, game.Path, ["foo"]);
         ModInstaller.Install([(LinkMod(ModHash.Of("Level_Cap.rb", Script)) with { Version = "1.4" }, "Level_Cap")], _ => Script, game.Path, ["Level_Cap"]);
@@ -146,8 +148,8 @@ public sealed class ModInstallerTests
     }
 
     /// <summary>
-    /// Asserts that a download that differs from the catalog, a file outside the mod's own script and
-    /// folder, a zip that lacks a file, holds another version or holds a file twice are refused, and
+    /// Asserts that a download that differs from the catalog, a path outside Patch or the game's
+    /// loader, a zip that lacks a file, holds another version or holds a file twice are refused, and
     /// that a file that cannot be written puts back the files written before it, so a refused install
     /// changes nothing.
     /// </summary>
@@ -160,16 +162,13 @@ public sealed class ModInstallerTests
         var good = LinkMod(ModHash.Of("Level_Cap.rb", Script));
         var differing = LinkMod("00" + ModHash.Of("Level_Cap.rb", Script)[2..]) with { Key = "other", Name = "Other" };
         var escape = UploadMod(new() { ["../Escape.rb"] = ModHash.Of("x.rb", Script) });
-        var other = UploadMod(new() { ["Luka_Replacer.rb"] = ModHash.Of("x.rb", Script), ["Party_Sheet/sheet.txt"] = ModHash.Of("sheet.txt", Pack) });
         var loader = UploadMod(new() { ["Patch.rb"] = ModHash.Of("x.rb", Script) });
         var exe = good with { Files = new Dictionary<string, string> { ["Level_Cap.exe"] = ModHash.Of("Level_Cap.exe", Script) } };
         var luka = UploadMod(new() { ["Luka_Replacer.rb"] = ModHash.Of("x.rb", Script), ["Luka_Replacer/Heroes/a.luka"] = ModHash.Of("a.luka", [1]) });
         var script = UploadMod(new() { ["Luka_Replacer.rb"] = ModHash.Of("x.rb", Script) });
 
         Assert.Contains("Other", Assert.Throws<InvalidDataException>(() => ModInstaller.Install([(good, "Level_Cap"), (differing, "Level_Cap")], _ => Script, game.Path)).Message);
-        Assert.Throws<InvalidDataException>(() => ModInstaller.Install([(good, "Map_Display")], _ => Script, game.Path));
         Assert.Throws<InvalidDataException>(() => ModInstaller.Install([(escape, "Escape")], _ => Zip(("../Escape.rb", Script)), game.Path));
-        Assert.Throws<InvalidDataException>(() => ModInstaller.Install([(other, "Luka_Replacer")], _ => Zip(("Luka_Replacer.rb", Script), ("Party_Sheet/sheet.txt", Pack)), game.Path));
         Assert.Throws<InvalidDataException>(() => ModInstaller.Install([(loader, "Patch")], _ => Zip(("Patch.rb", Script)), game.Path));
         Assert.Throws<InvalidDataException>(() => ModInstaller.Install([(exe, "Level_Cap")], _ => Script, game.Path));
         Assert.Throws<InvalidDataException>(() => ModInstaller.Install([(luka, "Luka_Replacer")], _ => Zip(("Luka_Replacer.rb", Script)), game.Path));
@@ -181,7 +180,7 @@ public sealed class ModInstallerTests
         var blocked = new CatalogMod("blocked", "Blocked", "1.0", new Dictionary<string, string> { ["Blocked.rb"] = ModHash.Of("Blocked.rb", Script) }, [], "https://mgqonline.org/files/Blocked.rb");
         Assert.ThrowsAny<System.Exception>(() => ModInstaller.Install([(good, "Level_Cap"), (blocked, "Blocked")], _ => Script, game.Path));
 
-        Assert.False(game.Has("Escape.rb") || game.Has("Patch/Map_Display.rb") || game.Has("Patch/Party_Sheet") || game.Has("Patch/Luka_Replacer.rb"));
+        Assert.False(game.Has("Escape.rb") || game.Has("Patch/Luka_Replacer.rb"));
         Assert.Equal("# loader\n", Encoding.UTF8.GetString(game.Read("Patch/Patch.rb")));
         Assert.Equal("old", Encoding.UTF8.GetString(game.Read("Patch/Level_Cap.rb")));
     }

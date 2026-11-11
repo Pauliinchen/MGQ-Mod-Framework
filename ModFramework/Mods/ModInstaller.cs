@@ -2,6 +2,8 @@
 //  ModInstaller.cs
 //
 //  Changelog:
+//      Paulinchen  2026-11-11: Wrote every file of a mod's package into Patch but the loader and the framework's files, and
+//                              removed the files of older versions after any update, a single script's too
 //      Paulinchen  2026-11-08: Logged a file of the zip left out as none of the mod's own files
 //      Paulinchen  2026-11-07: Wrote the mods that run into the waiting folder instead of over their files
 //                            - Used the bridge and the runtime under the framework's namespace
@@ -37,7 +39,7 @@ using MGQParadox.ModFramework.Runtime;
 namespace MGQParadox.ModFramework.Mods;
 
 /// <summary>
-/// Installs mods into the game's Patch folder, each into its own script and folder.
+/// Installs mods into the game's Patch folder, each file to its path inside Patch.
 /// </summary>
 /// <remarks>
 /// Every file is staged and checked against the catalog's hash before any moves into place, so a
@@ -64,7 +66,7 @@ internal static class ModInstaller
     /// <param name="gameFolder">The game's folder, which holds Patch.</param>
     /// <param name="waiting">The names in Patch of the mods whose files wait; <see langword="null"/> for none.</param>
     /// <returns>The files written or waiting, relative to the game's folder.</returns>
-    /// <exception cref="InvalidDataException">A file differs from the catalog, is missing, or would land outside its mod's own script and folder.</exception>
+    /// <exception cref="InvalidDataException">A file differs from the catalog, is missing, or is a path no mod may write, see <see cref="PatchFolder.RefusalOf"/>.</exception>
     public static IReadOnlyList<string> Install(IReadOnlyList<(CatalogMod Mod, string Name)> mods, Func<CatalogMod, byte[]> download, string gameFolder, IReadOnlyCollection<string>? waiting = null)
     {
         var game = Path.GetFullPath(gameFolder);
@@ -77,12 +79,12 @@ internal static class ModInstaller
         {
             foreach (var (mod, name) in mods)
             {
-                var files = mod.Archive ? FilesOfZip(mod, download(mod), patch, name) : [FileOfLink(mod, download(mod), patch, name)];
+                var files = mod.Archive ? FilesOfZip(mod, download(mod), patch) : [FileOfLink(mod, download(mod), patch)];
 
                 if (waiting != null && waiting.Contains(name, StringComparer.OrdinalIgnoreCase))
                 {
                     var targets = new HashSet<string>(files.Select(file => file.Path), StringComparer.OrdinalIgnoreCase);
-                    waits.Add((mod.Name, mod.Version, files, mod.Archive ? OldFiles(mod, name, patch, targets).Select(old => old.Path).ToList() : []));
+                    waits.Add((mod.Name, mod.Version, files, OldFiles(mod, patch, targets).Select(old => old.Path).ToList()));
                     continue;
                 }
 
@@ -98,9 +100,9 @@ internal static class ModInstaller
             MoveIntoPlace(staged, stage, game, () => WaitingUpdate.Commit(game, lines));
             var written = new HashSet<string>(staged.Select(file => file.Target), StringComparer.OrdinalIgnoreCase);
 
-            foreach (var (mod, name) in mods.Where(mod => mod.Mod.Archive && !(waiting != null && waiting.Contains(mod.Name, StringComparer.OrdinalIgnoreCase))))
+            foreach (var (mod, _) in mods.Where(mod => !(waiting != null && waiting.Contains(mod.Name, StringComparer.OrdinalIgnoreCase))))
             {
-                RemoveOldFiles(mod, game, OldFiles(mod, name, patch, written));
+                RemoveOldFiles(mod, game, OldFiles(mod, patch, written));
             }
 
             return staged.Select(file => file.Target).Concat(waits.SelectMany(wait => wait.Files.Select(file => file.Target))).Select(path => Path.GetRelativePath(game, path)).ToList();
@@ -228,18 +230,18 @@ internal static class ModInstaller
     }
 
     /// <summary>
-    /// Finds the files an older version of a zip mod shipped that the version installed no longer
+    /// Finds the files an older version of a mod shipped that the version installed no longer
     /// has, each only while it is exactly that version's file.
     /// </summary>
     /// <remarks>
-    /// The game's loader runs every script in a mod's folder, so a script a newer version dropped would still run.
+    /// The game's loader runs every script in a mod's folder, and every script at the top of Patch, so a script a newer
+    /// version dropped or renamed would still run.
     /// </remarks>
     /// <param name="mod">The mod installed.</param>
-    /// <param name="own">Its name in Patch; a file outside its own script and folder stays.</param>
     /// <param name="patch">The full path of the Patch folder.</param>
     /// <param name="written">The full paths the install writes, which stay whatever an older version named them.</param>
     /// <returns>Each file's full path and the version that shipped it.</returns>
-    private static List<(string Path, string Version)> OldFiles(CatalogMod mod, string own, string patch, IReadOnlySet<string> written)
+    private static List<(string Path, string Version)> OldFiles(CatalogMod mod, string patch, IReadOnlySet<string> written)
     {
         var old = new List<(string Path, string Version)>();
 
@@ -247,7 +249,7 @@ internal static class ModInstaller
         {
             foreach (var (name, hash) in version.Files)
             {
-                if (mod.Files.ContainsKey(name) || !PatchFolder.Owns(own, name) || FolderGuard.Inside(patch, PatchFolder.Resolve(patch, name)) is not { } path
+                if (mod.Files.ContainsKey(name) || PatchFolder.RefusalOf(name, IsFramework(mod)) != null || FolderGuard.Inside(patch, PatchFolder.Resolve(patch, name)) is not { } path
                     || written.Contains(path) || old.Exists(file => string.Equals(file.Path, path, StringComparison.OrdinalIgnoreCase)))
                 {
                     continue;
@@ -298,12 +300,11 @@ internal static class ModInstaller
     /// <param name="mod">The mod.</param>
     /// <param name="bytes">The script as downloaded.</param>
     /// <param name="patch">The full path of the Patch folder.</param>
-    /// <param name="own">The mod's name in Patch.</param>
     /// <returns>The script and its full target path.</returns>
-    private static (byte[] Bytes, string Path) FileOfLink(CatalogMod mod, byte[] bytes, string patch, string own)
+    private static (byte[] Bytes, string Path) FileOfLink(CatalogMod mod, byte[] bytes, string patch)
     {
         var (name, hash) = mod.Files.Count == 1 ? mod.Files.First() : throw new InvalidDataException($"{mod.Name} names no single script.");
-        var path = Inside(patch, own, PathInsidePatch(name), mod);
+        var path = Inside(patch, PathInsidePatch(name), mod);
 
         if (!path.EndsWith(".rb", StringComparison.OrdinalIgnoreCase))
         {
@@ -319,9 +320,8 @@ internal static class ModInstaller
     /// <param name="mod">The mod.</param>
     /// <param name="zip">The zip as downloaded.</param>
     /// <param name="patch">The full path of the Patch folder.</param>
-    /// <param name="own">The mod's name in Patch.</param>
     /// <returns>Each file and its full target path.</returns>
-    private static List<(byte[] Bytes, string Path)> FilesOfZip(CatalogMod mod, byte[] zip, string patch, string own)
+    private static List<(byte[] Bytes, string Path)> FilesOfZip(CatalogMod mod, byte[] zip, string patch)
     {
         using var archive = new ZipArchive(new MemoryStream(zip), ZipArchiveMode.Read);
         var entries = new Dictionary<string, ZipArchiveEntry>(StringComparer.Ordinal);
@@ -353,12 +353,12 @@ internal static class ModInstaller
                 throw new InvalidDataException($"{name} of {mod.Name} differs from the version the website keeps.");
             }
 
-            files.Add((bytes, Inside(patch, own, name, mod)));
+            files.Add((bytes, Inside(patch, name, mod)));
         }
 
         foreach (var path in entries.Keys.Where(path => path.Length > 0 && !path.EndsWith('/') && !mod.Files.ContainsKey(path)))
         {
-            Log.Write($"left out {path} of {mod.Name}, which is none of its own files the catalog names");
+            Log.Write($"left out {path} of {mod.Name}, which is none of the files the catalog names for Patch");
         }
 
         return files;
@@ -383,15 +383,21 @@ internal static class ModInstaller
     }
 
     /// <summary>
-    /// Makes sure a path inside Patch is the mod's own: its script or a file in its folder, never
-    /// another mod's or the game's loader.
+    /// Makes sure a mod may write a path inside Patch: one that stays inside Patch and is neither
+    /// the game's loader nor, but for the framework itself, the framework's.
     /// </summary>
     /// <param name="patch">The full path of the Patch folder.</param>
-    /// <param name="own">The mod's name in Patch.</param>
     /// <param name="path">The path inside Patch.</param>
     /// <param name="mod">The mod it belongs to.</param>
     /// <returns>The full path, spelled as Patch spells it.</returns>
-    private static string Inside(string patch, string own, string path, CatalogMod mod) =>
-        (PatchFolder.Owns(own, path) ? FolderGuard.Inside(patch, PatchFolder.Resolve(patch, path)) : null)
-        ?? throw new InvalidDataException($"{mod.Name} would write {path}, which is not its own in the Patch folder.");
+    private static string Inside(string patch, string path, CatalogMod mod) =>
+        (PatchFolder.RefusalOf(path, IsFramework(mod)) == null ? FolderGuard.Inside(patch, PatchFolder.Resolve(patch, path)) : null)
+        ?? throw new InvalidDataException($"{mod.Name} would write {path}, which no mod may write in the Patch folder.");
+
+    /// <summary>
+    /// Tells whether a mod is the framework itself, the only one that may write the framework's files.
+    /// </summary>
+    /// <param name="mod">The mod.</param>
+    /// <returns>Whether its id names the website's <see cref="PatchFolder.FrameworkSlug"/>.</returns>
+    internal static bool IsFramework(CatalogMod mod) => mod.Key == $"site:{PatchFolder.FrameworkSlug}";
 }

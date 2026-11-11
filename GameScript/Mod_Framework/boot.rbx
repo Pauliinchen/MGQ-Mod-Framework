@@ -2,6 +2,7 @@
 #  boot.rbx
 #
 #  Changelog:
+#      Paulinchen  2026-11-11: Noted the scripts of Patch as the game's loader listed them, before the waiting updates moved in
 #      Paulinchen  2026-11-07: Moved the updates waiting in Patch/Mod_Framework/Waiting into place before the pick
 #      Paulinchen  2026-10-31: Put the files the web installer could not write in place and removed those it could not remove
 #      Paulinchen  2026-10-30: Counted the library for JoiPlay as a copy's DLL there
@@ -81,6 +82,8 @@ begin
           #
           # @raise [RuntimeError] No copy is installed.
           def self.run
+            # A run after a failed one must not count the files the failed run moved in as listed.
+            @listed ||= Dir.glob("#{PATCH}/**/*.rb")
             @notes = []
             finish_waiting
             finish_web_install
@@ -94,6 +97,14 @@ begin
             @dll = copy[:dll]
             file = "#{@folder}/#{LOADER}"
             eval(File.read(file, encoding: "BOM|UTF-8"), TOPLEVEL_BINDING, file)
+          end
+
+          # Lists the scripts of PATCH as the game's loader listed them, before the waiting updates and
+          # the web installer's stand-ins changed the folder.
+          #
+          # @return [Array<String>] Their paths relative to the game folder; none before the boot.
+          def self.listed
+            @listed || []
           end
 
           # Tells the picked copy's folder.

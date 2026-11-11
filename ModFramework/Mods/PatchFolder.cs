@@ -2,6 +2,9 @@
 //  PatchFolder.cs
 //
 //  Changelog:
+//      Paulinchen  2026-11-11: Refused only paths that leave Patch and the loader and framework files for any mod but the
+//                              framework, instead of keeping each mod to its own script and folder
+//                            - Listed the loader rows a package gives
 //      Paulinchen  2026-11-09: Left out a folder whose scripts lie only in a Patch folder inside it
 //      Paulinchen  2026-11-07: Used the bridge and the runtime under the framework's namespace
 //                            - Refused a path that leaves Patch as a mod's own
@@ -20,7 +23,7 @@ namespace MGQParadox.ModFramework.Mods;
 
 /// <summary>
 /// The game folder's Patch folder, which holds every mod: a script at its top with the folder of
-/// the same name, or such a folder alone; the names those mods take and the places that are theirs.
+/// the same name, or such a folder alone; the names those mods take and the paths no mod may write.
 /// </summary>
 /// <remarks>
 /// Under Linux the folder is case-sensitive while the game finds its files whatever their case, so
@@ -47,6 +50,16 @@ internal static class PatchFolder
     /// The framework's folder in Patch, which holds its files, Mods.ini and the cache.
     /// </summary>
     public const string FrameworkFolder = "Mod_Framework";
+
+    /// <summary>
+    /// The framework's slug on the website, the only mod that may ship its files.
+    /// </summary>
+    public const string FrameworkSlug = "mod-framework";
+
+    /// <summary>
+    /// The game's loader at the top of Patch, which no mod may replace.
+    /// </summary>
+    private const string Loader = "Patch.rb";
 
     /// <summary>
     /// The longest name a mod takes.
@@ -132,35 +145,78 @@ internal static class PatchFolder
     }
 
     /// <summary>
-    /// Tells whether a path inside Patch is a mod's: its script at the top or a file in its folder;
-    /// for the framework its entry file or a file in its folder.
+    /// Tells why a path inside Patch may not be written by a mod's package.
     /// </summary>
-    /// <param name="name">The mod's name.</param>
     /// <param name="path">The path inside Patch, with either slash.</param>
-    /// <returns>Whether it is; never for a name no mod takes, such as the game's loader's, or a path that leaves Patch.</returns>
-    public static bool Owns(string name, string path)
+    /// <param name="framework">Whether the package is the framework's, which alone may write its own files.</param>
+    /// <returns>Why not, after the path; <see langword="null"/> when it may.</returns>
+    public static string? RefusalOf(string path, bool framework)
     {
-        var slashed = path.Replace('\\', '/');
+        var parts = path.Replace('\\', '/').Split('/');
 
-        if (ModMerge.RefusalOf(slashed) != null)
+        if (path.Contains(':', StringComparison.Ordinal) || parts.Any(part => part.Length == 0 || part.Trim().Trim('.').Length == 0))
         {
-            return false;
+            return "would land outside the Patch folder";
         }
 
-        var parts = slashed.Split('/');
-
-        if (string.Equals(name, FrameworkFolder, StringComparison.OrdinalIgnoreCase))
+        if (framework)
         {
-            return parts.Length == 1 ? Same(parts[0], FrameworkEntry) : Same(parts[0], FrameworkFolder);
+            return null;
         }
 
-        return IsName(name) && (parts.Length == 1 ? Same(parts[0], name + Script) : Same(parts[0], name));
+        if (parts.Length == 1 && Same(parts[0], Loader))
+        {
+            return "is the game's loader, which no mod may replace";
+        }
+
+        return (parts.Length == 1 && Same(parts[0], FrameworkEntry)) || Same(parts[0], FrameworkFolder)
+            ? "is the Mod Framework's, which only the framework itself ships"
+            : null;
+    }
+
+    /// <summary>
+    /// Tells whether a path inside Patch is one of the framework's own files: its entry file or a
+    /// file in its folder.
+    /// </summary>
+    /// <param name="path">The path inside Patch, with forward slashes.</param>
+    /// <returns>Whether it is.</returns>
+    public static bool IsFrameworkFile(string path) =>
+        Same(path, FrameworkEntry) || path.StartsWith(FrameworkFolder + "/", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Lists the mods the loader finds in a package's files, by the rule of <see cref="ModNames"/>.
+    /// </summary>
+    /// <remarks>
+    /// It restates <see cref="ModNames"/> over a list of paths instead of the disk, so the two change together.
+    /// </remarks>
+    /// <param name="paths">The files' paths inside Patch, with forward slashes.</param>
+    /// <returns>Each script at the top without its extension, and each top folder holding a script outside a Patch folder right inside it, each once, sorted.</returns>
+    public static List<string> RowsOf(IEnumerable<string> paths)
+    {
+        var rows = new List<string>();
+
+        foreach (var parts in paths.Select(path => path.Split('/')).Where(parts => IsScript(parts[^1])))
+        {
+            if (parts.Length == 1)
+            {
+                rows.Add(parts[0][..^Script.Length]);
+            }
+            else if (parts.Length == 2 || !Same(parts[1], Name))
+            {
+                rows.Add(parts[0]);
+            }
+        }
+
+        return rows.Distinct(StringComparer.OrdinalIgnoreCase).Order(StringComparer.OrdinalIgnoreCase).ToList();
     }
 
     /// <summary>
     /// Lists the mods the Patch folder holds: each script at its top, and each folder there that holds
     /// a script outside a Patch folder right inside it and has no script of its name beside it.
     /// </summary>
+    /// <remarks>
+    /// <see cref="RowsOf"/> restates this rule over a package's list of files, so the two change together.
+    /// </remarks>
     /// <param name="gameFolder">The game folder.</param>
     /// <returns>The names, sorted; a name that is no mod's is left out, logged when it would be one.</returns>
     public static List<string> ModNames(string gameFolder)

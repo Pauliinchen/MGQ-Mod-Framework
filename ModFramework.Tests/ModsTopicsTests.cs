@@ -2,7 +2,12 @@
 //  ModsTopicsTests.cs
 //
 //  Changelog:
-//      Paulinchen  2026-11-11: Read how a mod stands before and after its install and removal
+//      Paulinchen  2026-11-11: Covered another mod's script that an older package of a mod carried
+//                            - Covered the whole latest version of a mod beside the older renamed script
+//                            - Covered the version the browser tells for a copy in part
+//                            - Covered a mod whose package renames its script, laid out like the game folder, its copies in
+//                              part and its removal, its wait while it runs under its older name and its line of Mods.ini
+//                            - Read how a mod stands before and after its install and removal
 //                            - Covered a collection turned on with the mods its mods need in turn, the needs an install brings and a mod
 //                              found by a name the picks hide
 //      Paulinchen  2026-11-09: Ran the work in a start that tells whether it started
@@ -67,6 +72,36 @@ public sealed class ModsTopicsTests : IDisposable
     /// A version of Level Cap newer than the one installed.
     /// </summary>
     private static readonly byte[] Newer = Encoding.UTF8.GetBytes("# newer\n");
+
+    /// <summary>
+    /// The script of the website's mod X 1.0, <c>X.rb</c>.
+    /// </summary>
+    private static readonly byte[] XScript = Encoding.UTF8.GetBytes("# X 1.0\n");
+
+    /// <summary>
+    /// The script of X 1.1, renamed to <c>0_X.rb</c>.
+    /// </summary>
+    private static readonly byte[] RenamedScript = Encoding.UTF8.GetBytes("# X 1.1, loads first\n");
+
+    /// <summary>
+    /// <c>X/a.rbx</c> of X 1.0.
+    /// </summary>
+    private static readonly byte[] XPart = Encoding.UTF8.GetBytes("a 1.0");
+
+    /// <summary>
+    /// <c>X/a.rbx</c> of X 1.1, longer than 1.0's.
+    /// </summary>
+    private static readonly byte[] NewerPart = Encoding.UTF8.GetBytes("a 1.1, longer");
+
+    /// <summary>
+    /// <c>X/old.rbx</c>, which only X 1.0 ships.
+    /// </summary>
+    private static readonly byte[] DroppedPart = Encoding.UTF8.GetBytes("old");
+
+    /// <summary>
+    /// <c>X_Data/t.txt</c>, which X 1.1 adds in a folder of another name.
+    /// </summary>
+    private static readonly byte[] Table = Encoding.UTF8.GetBytes("table");
 
     /// <summary>
     /// The game folder.
@@ -583,6 +618,154 @@ public void Needs_ListsWhatInstallsTurnsOnOrComesFromItsAuthor()
     }
 
     /// <summary>
+    /// Asserts, with the shape of the Unified Bugfix Module, that a mod owns every file its package
+    /// puts into Patch whatever their names: the website's mod X is available on a game without it;
+    /// its 1.0 placed by hand, turned off, reads as one mod of 1.0 with an update; the update to 1.1,
+    /// which renames the script, changes a file, adds a folder of another name and comes laid out
+    /// like the game folder with a readme beside Patch, waits while 1.0 runs, with the renamed script
+    /// and the file 1.1 dropped to remove; else it writes every file under Patch, never the readme,
+    /// removes those two files, and the renamed mod stays off. A copy missing a file reads
+    /// as an update that the updates list and Update all rewrites whole, while the Mods List, the
+    /// browser and the loader tell its version as unknown; the whole 1.1 beside the older renamed
+    /// script reads so too, and Update all removes that script; a copy with a file of an older
+    /// version reads as an update too, and its removal deletes every file and folder. Of the mod
+    /// Y, whose versions share a script, a copy in part reads as the version most of its files
+    /// are, and a file that matches no version makes a changed copy, which is never removed. The
+    /// script of another mod that Z 1.0 carried leaves Z available alone and current beside Z 1.1.
+    /// </summary>
+    [Fact]
+    public void WholePackage_UpdatesRepairsAndRemovesEveryFile()
+    {
+        StoreWholePackages();
+        var available = StatusOf("site:x");
+        _game.Put("Patch/X.rb", XScript);
+        _game.Put("Patch/X/a.rbx", XPart);
+        _game.Put("Patch/X/old.rbx", DroppedPart);
+        _ui.Value(ModsTopics.SetTopic, new RubyHash { { "on", new RubyHash { { "X", false } } } });
+        var rows = InstalledRows().Where(mod => !mod["id"].IsNil && mod["id"].AsText() == "site:x").ToList();
+        var browsed = BrowsedRow("site:x");
+        _downloads["site:x"] = () => ModInstallerTests.Zip(("Patch/0_X.rb", RenamedScript), ("Patch/X/a.rbx", NewerPart), ("Patch/X_Data/t.txt", Table), ("Readme.txt", Table));
+
+        _ui.Value(ModsTopics.InstallTopic, new RubyHash { { "ids", new RubyArray { "site:x" } }, { "running", new RubyArray { "X" } } });
+        var waited = Encoding.UTF8.GetString(_game.Read("Patch/Mod_Framework/Waiting/Waiting.txt"));
+        var untouched = _game.Has("Patch/X.rb") && !_game.Has("Patch/0_X.rb");
+        WaitingUpdate.Drop(_game.Path, "X");
+        var started = _ui.Value(ModsTopics.InstallTopic, new RubyHash { { "ids", new RubyArray { "site:x" } } }).AsHash();
+
+        Assert.Equal(ModStatus.Available, available);
+        Assert.Equal([("X", "1.0", true, false)], rows.Select(row => (row["name"].AsText(), row["version"].AsText(), row["update"].AsBool(), row["on"].AsBool())));
+        Assert.Equal((ModStatus.Update, "1.0"), (browsed["status"].AsText(), browsed["installed"].AsText()));
+        Assert.True(untouched);
+        Assert.Contains("remove\tPatch/X.rb\nremove\tPatch/X/old.rbx\n", waited);
+        Assert.Equal(RubyBool.True, started["started"]);
+        Assert.Equal([RenamedScript, NewerPart, Table], new[] { "Patch/0_X.rb", "Patch/X/a.rbx", "Patch/X_Data/t.txt" }.Select(_game.Read));
+        Assert.Equal((false, false, false), (_game.Has("Patch/Readme.txt"), _game.Has("Patch/X.rb"), _game.Has("Patch/X/old.rbx")));
+        Assert.Equal(ModStatus.Current, StatusOf("site:x"));
+        Assert.False(InstalledRows().Single(mod => mod["name"].AsText() == "0_X")["on"].AsBool());
+
+        // A file of the latest version goes missing.
+        _ui.Value(ModsTopics.SetTopic, new RubyHash { { "on", new RubyHash { { "0_X", true } } } });
+        File.Delete(Path.Combine(_game.Path, "Patch", "X_Data", "t.txt"));
+        var part = InstalledRows().Single(mod => mod["name"].AsText() == "0_X");
+        var load = _ui.Value(ModsTopics.PlanTopic).AsHash()["load"].AsArray().Select(mod => mod.AsArray()).Single(mod => mod[0].AsText() == "0_X");
+        var updates = _ui.Value(ModsTopics.UpdatesTopic).AsHash()["updates"].AsArray().Select(update => update.AsHash()).ToList();
+        var browsedPart = BrowsedRow("site:x");
+
+        Assert.Equal((ModStatus.Update, InstalledMod.Unknown), (browsedPart["status"].AsText(), browsedPart["installed"].AsText()));
+        Assert.Equal((InstalledMod.Unknown, true), (part["version"].AsText(), part["update"].AsBool()));
+        Assert.Equal(InstalledMod.Unknown, load[3].AsText());
+        Assert.Equal([("site:x", "1.1")], updates.Select(update => (update["id"].AsText(), update["installed"].AsText())));
+
+        _ui.Value(ModsTopics.InstallTopic, new RubyHash { { "ids", new RubyArray { "site:x" } } });
+
+        Assert.Equal(Table, _game.Read("Patch/X_Data/t.txt"));
+        Assert.Equal(ModStatus.Current, StatusOf("site:x"));
+
+        // The older renamed script comes back beside the whole latest version.
+        _game.Put("Patch/X.rb", XScript);
+        var leftover = BrowsedRow("site:x");
+        var both = InstalledRows().Where(mod => mod["name"].AsText() is "0_X" or "X").ToList();
+
+        _ui.Value(ModsTopics.InstallTopic, new RubyHash { { "ids", new RubyArray { "site:x" } } });
+
+        Assert.Equal((ModStatus.Update, InstalledMod.Unknown), (leftover["status"].AsText(), leftover["installed"].AsText()));
+        Assert.Equal([(InstalledMod.Unknown, true), (InstalledMod.Unknown, true)], both.Select(row => (row["version"].AsText(), row["update"].AsBool())));
+        Assert.False(_game.Has("Patch/X.rb"));
+        Assert.Equal(ModStatus.Current, StatusOf("site:x"));
+
+        // A file goes back to the older version's, and the mod is removed.
+        _game.Put("Patch/X/a.rbx", XPart);
+        var older = StatusOf("site:x");
+        var removed = _ui.Value(ModsTopics.RemoveTopic, new RubyHash { { "ids", new RubyArray { "site:x" } } }).AsHash();
+
+        Assert.Equal((ModStatus.Update, new RubyArray { "X" }), (older, removed["removed"]));
+        Assert.False(_game.Has("Patch/0_X.rb") || _game.Has("Patch/X") || _game.Has("Patch/X_Data"));
+
+        // Y 1.0 and 1.1 share their script; a copy of 1.0 misses a file, then holds a file of no version.
+        _game.Put("Patch/Y.rb", ScriptOf("Y"));
+        _game.Put("Patch/Y/a.rbx", XPart);
+        var behind = _ui.Value(ModsTopics.UpdatesTopic).AsHash()["updates"].AsArray().Select(update => update.AsHash()).ToList();
+        _game.Put("Patch/Y/a.rbx", DroppedPart);
+        var changed = StatusOf("site:y");
+        var kept = _ui.Value(ModsTopics.RemoveTopic, new RubyHash { { "ids", new RubyArray { "site:y" } } }).AsHash();
+
+        Assert.Equal([("site:y", "1.0")], behind.Select(update => (update["id"].AsText(), update["installed"].AsText())));
+        Assert.Equal(ModStatus.Changed, changed);
+        Assert.Empty(kept["removed"].AsArray());
+        Assert.True(_game.Has("Patch/Y.rb") && _game.Has("Patch/Y/a.rbx"));
+
+        // Z 1.0 carried the script of another mod, which is all the game holds, then beside Z 1.1.
+        _game.Put("Patch/Shared.rb", ScriptOf("Shared"));
+        var alone = StatusOf("site:z");
+        var listed = _ui.Value(ModsTopics.UpdatesTopic).AsHash()["updates"].AsArray().Select(update => update.AsHash()["id"].AsText()).ToList();
+        _game.Put("Patch/Z.rb", ScriptOf("Z"));
+        _game.Put("Patch/Z/a.rbx", NewerPart);
+
+        Assert.Equal(ModStatus.Available, alone);
+        Assert.DoesNotContain("site:z", listed);
+        Assert.Equal(ModStatus.Current, StatusOf("site:z"));
+    }
+
+    /// <summary>
+    /// Keeps a website list in the cache with the mods X, Y and Z of <see cref="WholePackage_UpdatesRepairsAndRemovesEveryFile"/>.
+    /// </summary>
+    private void StoreWholePackages()
+    {
+        var x = $$"""
+            {"slug":"x","name":"X","author":"Someone","tag":"Regular","versions":[
+             {{VersionOf("x", "1.1", 25, ("Patch/0_X.rb", RenamedScript), ("Patch/X/a.rbx", NewerPart), ("Patch/X_Data/t.txt", Table), ("Readme.txt", Table))}},
+             {{VersionOf("x", "1.0", 20, ("X.rb", XScript), ("X/a.rbx", XPart), ("X/old.rbx", DroppedPart))}}]}
+            """;
+        var y = $$"""
+            {"slug":"y","name":"Y","author":"Someone","tag":"Regular","versions":[
+             {{VersionOf("y", "1.1", 25, ("Y.rb", ScriptOf("Y")), ("Y/a.rbx", NewerPart), ("Y/b.rbx", Table))}},
+             {{VersionOf("y", "1.0", 20, ("Y.rb", ScriptOf("Y")), ("Y/a.rbx", XPart), ("Y/b.rbx", Table))}}]}
+            """;
+        var z = $$"""
+            {"slug":"z","name":"Z","author":"Someone","tag":"Regular","versions":[
+             {{VersionOf("z", "1.1", 25, ("Z.rb", ScriptOf("Z")), ("Z/a.rbx", NewerPart))}},
+             {{VersionOf("z", "1.0", 20, ("Z.rb", ScriptOf("Z")), ("Z/a.rbx", XPart), ("Shared.rb", ScriptOf("Shared")))}}]}
+            """;
+        ModCache.StoreSite(_game.Path, Encoding.UTF8.GetBytes($$"""{"schema":2,"mods":[{{x}},{{y}},{{z}}]}"""));
+    }
+
+    /// <summary>
+    /// Writes a version of schema 2 of the website's list whose package is a zip.
+    /// </summary>
+    /// <param name="slug">The mod's slug.</param>
+    /// <param name="version">The version.</param>
+    /// <param name="day">The day of October it was uploaded on.</param>
+    /// <param name="files">Each file's path in the zip and bytes.</param>
+    /// <returns>The version as JSON.</returns>
+    private static string VersionOf(string slug, string version, int day, params (string Path, byte[] Bytes)[] files)
+    {
+        var listed = string.Join(',', files.Select(file => $$"""{"path":"{{file.Path}}","sha256":"{{ModMergeTests.Raw(file.Bytes)}}"}"""));
+        return $$"""
+            {"version":"{{version}}","changelog":"","uploadedAt":"2026-10-{{day}}T10:00:00+00:00","package":{"name":"{{slug}}.zip","size":1,"sha256":"aa","url":"https://mgqonline.org/mods/{{slug}}/{{version}}/download"},"files":[{{listed}}],"requires":[]}
+            """;
+    }
+
+    /// <summary>
     /// Writes a mod of schema 2 of the website's list with one version, whose script is
     /// <see cref="ScriptOf"/> its name.
     /// </summary>
@@ -663,8 +846,22 @@ public void Needs_ListsWhatInstallsTurnsOnOrComesFromItsAuthor()
     /// </summary>
     /// <param name="id">The mod's id.</param>
     /// <returns>Its status, see <see cref="ModStatus"/>.</returns>
-    private string StatusOf(string id) =>
-        _ui.Value(ModsTopics.BrowseTopic).AsHash()["mods"].AsArray().Select(mod => mod.AsHash()).First(mod => mod["id"].AsText() == id)["status"].AsText();
+    private string StatusOf(string id) => BrowsedRow(id)["status"].AsText();
+
+    /// <summary>
+    /// Asks the Mods List for its rows.
+    /// </summary>
+    /// <returns>Each installed mod's row.</returns>
+    private List<RubyHash> InstalledRows() =>
+        _ui.Value(ModsTopics.StateTopic).AsHash()["mods"].AsArray().Select(mod => mod.AsHash()).ToList();
+
+    /// <summary>
+    /// Asks the browser for a mod's row.
+    /// </summary>
+    /// <param name="id">The mod's id.</param>
+    /// <returns>The row.</returns>
+    private RubyHash BrowsedRow(string id) =>
+        _ui.Value(ModsTopics.BrowseTopic).AsHash()["mods"].AsArray().Select(mod => mod.AsHash()).First(mod => mod["id"].AsText() == id);
 
     /// <summary>
     /// Reads Mods.ini.

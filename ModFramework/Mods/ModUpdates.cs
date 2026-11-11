@@ -2,6 +2,7 @@
 //  ModUpdates.cs
 //
 //  Changelog:
+//      Paulinchen  2026-11-11: Met no need with a copy installed in part
 //      Paulinchen  2026-11-08: Left the mods the player updates by hand out of the updates and told a need of one
 //      Paulinchen  2026-11-07: Removed the list of mods the helper was told to update
 //                            - Used the bridge and the runtime under the framework's namespace
@@ -136,14 +137,14 @@ internal static class ModUpdates
     /// Only the website keeps the downloads of older versions, so an exact older version comes from its own list alone.
     /// </remarks>
     /// <param name="mod">The mod as the lists offer it; <see langword="null"/> while they know none of that name.</param>
-    /// <param name="state">How it stands in the game folder; <see langword="null"/> for unknown.</param>
+    /// <param name="state">How it stands in the game folder; <see langword="null"/> for unknown, as a copy installed in part counts.</param>
     /// <param name="least">The version needed, such as <c>0.7.0</c>.</param>
     /// <param name="exact">Whether exactly that version is needed, an older one too.</param>
     /// <param name="have">The version the mod knows it runs, which counts before the files' version; <see langword="null"/> for none.</param>
     /// <returns>How it stands.</returns>
     public static RequiredVersion Require(BrowsedMod? mod, ModState? state, string least, bool exact, string? have)
     {
-        var installed = have is { Length: > 0 } ? have : state?.Installed?.Version;
+        var installed = have is { Length: > 0 } ? have : state is { Repair: false } ? state.Installed?.Version : null;
 
         if (installed != null && (exact ? ModMerge.CompareVersions(installed, least) == 0 : ModMerge.CompareVersions(installed, least) >= 0))
         {

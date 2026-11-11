@@ -2,7 +2,8 @@
 #  mods_loader_test.rb
 #
 #  Changelog:
-#      Paulinchen  2026-11-11: Covered scripts loaded late through Mods.load_late
+#      Paulinchen  2026-11-11: Covered a script an update renamed, which moved in after the game's loader listed Patch
+#                            - Covered scripts loaded late through Mods.load_late
 #                            - Had Level_Cap wrap load_normal_database, as the Unified Bugfix Module does
 #      Paulinchen  2026-11-09: Covered a script in Patch/Patch, which is logged and named in a message
 #                            - Covered a release folder extracted into Patch, which is no mod
@@ -20,8 +21,9 @@
 # Covers mods_loader.rbx in a booted game without the DLL, the order coming from Mods.ini: a game
 # session from the boot through the title to New Game with the traps of a late load and a script
 # loaded late after it, a folder mod under the Russian translation's loader, a world that leaves
-# the other mods out, a Title mod that embeds the framework, a mod that calls a name the framework
-# no longer has, and mods extracted into Patch/Patch and into a release folder's Patch inside Patch.
+# the other mods out, a Title mod that embeds the framework, a script an update renamed at the
+# start, a mod that calls a name the framework no longer has, and mods extracted into Patch/Patch
+# and into a release folder's Patch inside Patch.
 
 require_relative "mods_loader_support"
 require_relative "tree_support"
@@ -171,6 +173,20 @@ in_game_folder do
   run_patch_loader
   SceneManager.run
   check("a Title mod that embeds the framework runs once, as does the mod before it, and the mod after waits", [$order, $patch_errors], [%w[Alpha Online], []])
+end
+
+# An update that renames its script waited for Restart now; the stub moves it in after the game's
+# loader listed the folder, so the loader never reads the new script and New Game loads it.
+in_game_folder do
+  put_mods({ "Rarity.rb" => "$order << 'Rarity 1.0'\n" }, "Rarity=on Regular\n")
+  install_stub
+  install_copy(STANDALONE, "0.1.0", :real => true, :dll => false)
+  put_waiting(["mod\tRarity\t1.1", "file\t0\tPatch/0_Rarity.rb", "remove\tPatch/Rarity.rb"], "0" => "$order << 'Rarity 1.1'\n")
+  run_patch_loader
+  $scenes = lambda { Scene_Title.new.command_new_game }
+  SceneManager.run
+  check("a script renamed by an update moved in at the start loads at New Game, not as one the game's loader ran",
+        [$order, Mod_Framework::Mods.loaded, $patch_errors], [["Rarity 1.1"], ["0_Rarity"], []])
 end
 
 # A mod that calls the old UI stops at the NameError with the DLL running: it loads nothing, the

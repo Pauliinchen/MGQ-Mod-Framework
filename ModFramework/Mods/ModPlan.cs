@@ -2,7 +2,8 @@
 //  ModPlan.cs
 //
 //  Changelog:
-//      Paulinchen  2026-11-11: Told the installed mods some mods need through the mods those need in turn
+//      Paulinchen  2026-11-11: Kept a mod off or on whose update renamed it, from the line of its older name
+//                            - Told the installed mods some mods need through the mods those need in turn
 //      Paulinchen  2026-11-07: Used the bridge and the runtime under the framework's namespace
 //      Paulinchen  2026-11-06: Removed the relay's catalog and the GitHub releases as sources of mods; the website is the only one
 //      Paulinchen  2026-11-01: Took a mod's tag only from its authors, never from the player
@@ -68,7 +69,7 @@ internal static class ModPlan
             lines.TryAdd(ini[index].Key, (ini[index].Value, index));
         }
 
-        var managed = installed.Select(mod => Tagged(mod, lines.TryGetValue(mod.Name, out var line) ? line.Entry : null)).ToList();
+        var managed = installed.Select(mod => Tagged(mod, LineOf(mod, lines, installed))).ToList();
         var ordered = new List<(InstalledMod Mod, string Tag, string From, bool On)>();
 
         var follows = new Dictionary<InstalledMod, Follows>();
@@ -191,6 +192,37 @@ internal static class ModPlan
     public static SiteConflict? ConflictBetween(InstalledMod one, InstalledMod other) =>
         (one.Notes?.Conflicts ?? []).FirstOrDefault(conflict => other.Keys.Contains(ModRequirement.KeyOf(conflict.Slug)))
         ?? (other.Notes?.Conflicts ?? []).FirstOrDefault(conflict => one.Keys.Contains(ModRequirement.KeyOf(conflict.Slug)));
+
+    /// <summary>
+    /// Finds the line of Mods.ini that tells whether a mod is on: its own, else the line of a name
+    /// another of its known versions takes, while no installed mod takes that name.
+    /// </summary>
+    /// <remarks>
+    /// An update that renames a mod's script would otherwise turn on a mod the player turned off.
+    /// </remarks>
+    /// <param name="mod">The mod.</param>
+    /// <param name="lines">The lines of Mods.ini and their places by mod name.</param>
+    /// <param name="installed">Every installed mod.</param>
+    /// <returns>The line; <see langword="null"/> for none.</returns>
+    private static ModsIniEntry? LineOf(InstalledMod mod, Dictionary<string, (ModsIniEntry Entry, int Index)> lines, IReadOnlyList<InstalledMod> installed)
+    {
+        if (lines.TryGetValue(mod.Name, out var own))
+        {
+            return own.Entry;
+        }
+
+        var old = mod.Known?.Known.Select(version => version.Name)
+            .FirstOrDefault(name => lines.ContainsKey(name) && !installed.Any(other => string.Equals(other.Name, name, StringComparison.OrdinalIgnoreCase)));
+
+        if (old == null)
+        {
+            return null;
+        }
+
+        var line = lines[old].Entry;
+        Log.Write($"{mod.Name} takes {(line.On ? "on" : "off")} from the line of {old}");
+        return line;
+    }
 
     /// <summary>
     /// Gives a mod its tag and tells whether it is on: a source's tag, else the tag of the copy of

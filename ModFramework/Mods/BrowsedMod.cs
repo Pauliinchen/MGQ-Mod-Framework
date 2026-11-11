@@ -2,6 +2,7 @@
 //  BrowsedMod.cs
 //
 //  Changelog:
+//      Paulinchen  2026-11-11: Told an update of a copy installed in part
 //      Paulinchen  2026-11-08: Told whether the player installs and updates the mod by hand
 //      Paulinchen  2026-11-07: Dropped the source of a mod, which is always the website
 //      Paulinchen  2026-11-06: Removed the relay's catalog and the GitHub releases as sources of mods; the website is the only one
@@ -31,7 +32,7 @@ namespace MGQParadox.ModFramework.Mods;
 /// <param name="Notes">The lines of the latest version's changelog.</param>
 /// <param name="Bytes">The size of the file it is downloaded as; 0 when unknown.</param>
 /// <param name="Install">The latest version as <see cref="ModInstaller"/> installs it, every other known version among its versions.</param>
-/// <param name="Folder">The mod's name in Patch, which its script and its folder take, see <see cref="PatchFolder.NameOf"/>.</param>
+/// <param name="Folder">The latest version's name in Patch and Mods.ini, see <see cref="ModVersion.Name"/>.</param>
 /// <param name="PackageHash">The SHA-256 of the file the website hands out.</param>
 /// <param name="Known">Every version known of the mod, the latest first, then the newest first, each with its files by their paths inside Patch.</param>
 /// <param name="Thumbnail">The image the website's card shows; <see langword="null"/> for none.</param>
@@ -59,7 +60,7 @@ internal sealed record BrowsedMod(string Id, string Name, string Author, string 
 internal static class ModStatus
 {
     /// <summary>
-    /// An older known version is installed.
+    /// An older known version is installed, or a known version in part.
     /// </summary>
     public const string Update = "update";
 
@@ -88,5 +89,6 @@ internal static class ModStatus
 /// How a mod of the mod browser stands in the game folder.
 /// </summary>
 /// <param name="Status">See <see cref="ModStatus"/>.</param>
-/// <param name="Installed">The known version installed whole; <see langword="null"/> when none is.</param>
-internal sealed record ModState(string Status, ModVersion? Installed);
+/// <param name="Installed">The known version installed whole, or in part for <paramref name="Repair"/>; <see langword="null"/> when none is.</param>
+/// <param name="Repair">Whether that version is installed only in part or beside files of another version, which an update rewrites whole, see <see cref="ModScan.StateOf"/>.</param>
+internal sealed record ModState(string Status, ModVersion? Installed, bool Repair = false);

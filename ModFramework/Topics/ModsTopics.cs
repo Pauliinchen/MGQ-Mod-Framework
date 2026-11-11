@@ -2,7 +2,8 @@
 //  ModsTopics.cs
 //
 //  Changelog:
-//      Paulinchen  2026-11-11: Planned and wrote changed lines of Mods.ini in one place for every change of the player
+//      Paulinchen  2026-11-11: Took whether a mod has an update from how its files stand
+//                            - Planned and wrote changed lines of Mods.ini in one place for every change of the player
 //      Paulinchen  2026-11-07: Started the game again from the game, without the helper
 //                            - Installed the framework and the mods that run into the waiting folder
 //                            - Used the bridge and the runtime under the framework's namespace
@@ -124,8 +125,8 @@ internal sealed partial class ModsTopics
     public const string RestartTopic = "mods.restart";
 
     /// <summary>
-    /// The topic that starts installing mods of the website into the Patch folder, each into its
-    /// own script and folder: {"ids" => [id, ...], "versions" => {id => version} (the version to
+    /// The topic that starts installing mods of the website into the Patch folder, every file of
+    /// each package: {"ids" => [id, ...], "versions" => {id => version} (the version to
     /// write of each, the latest when left out), "running" => [name, ...] (the mods that run in the
     /// game, which wait for the next start as the framework does)} answers {"started" => true or
     /// false, "refused" => why for the player, or nil}.
@@ -653,7 +654,6 @@ internal sealed partial class ModsTopics
         foreach (var planned in plan.Mods)
         {
             var mod = planned.Mod;
-            var update = mod.Known is { } known && mod.Version != InstalledMod.Unknown && ModMerge.CompareVersions(known.Latest, mod.Version) > 0;
             mods.Add(new RubyHash
             {
                 { "name", mod.Name },
@@ -669,7 +669,7 @@ internal sealed partial class ModsTopics
                 { "on", planned.On },
                 { "version", mod.Version },
                 { "latest", mod.Known?.Latest },
-                { "update", update },
+                { "update", mod.Update },
                 { "id", mod.Known?.Id },
                 { "requires", new RubyArray(mod.Requires.Select(requirement => (RubyValue)new RubyArray { requirement.Name, requirement.Version })) },
                 { "needs", new RubyArray(ModPlan.NeedsOf(planned, plan.Mods, _framework).Select(need => (RubyValue)new RubyArray { need.Name, need.Version, need.State, need.Have, need.Mod })) },

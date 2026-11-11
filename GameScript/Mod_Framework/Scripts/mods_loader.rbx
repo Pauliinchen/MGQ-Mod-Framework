@@ -2,7 +2,9 @@
 #  mods_loader.rbx
 #
 #  Changelog:
-#      Paulinchen  2026-11-11: Added Mods.load_late, which loads scripts once the game runs through the traps of a late load
+#      Paulinchen  2026-11-11: Counted a mod as run before the framework booted only when the game's loader listed its scripts
+#                            - Told whether the game's loader reads the folders of Patch from the scripts it listed
+#                            - Added Mods.load_late, which loads scripts once the game runs through the traps of a late load
 #                            - Read the database again once a mod wrapped DataManager.load_normal_database too
 #      Paulinchen  2026-11-09: Logged the scripts and framework copies in a Patch folder inside Patch and named their folders in a message
 #      Paulinchen  2026-11-08: Forgot the remembered hotkeys of the mods that loaded once the boot and the entering loaded them
@@ -251,7 +253,7 @@ module Mod_Framework
       end
 
       # Ends the hold and puts File.read back as it was; notes whether the loader read the scripts
-      # in the folders of Patch, which it did unless such scripts lay there and it read none.
+      # in the folders of Patch, which it did unless it listed such scripts and read none.
       def self.stop
         return unless @holding
 
@@ -259,7 +261,8 @@ module Mod_Framework
         owner = ::File.singleton_class
         @replaced ? owner.send(:define_method, :read, @replaced) : owner.send(:remove_method, :read)
         @replaced = nil
-        nested = Dir.glob("#{FOLDER}/*/**/*#{SCRIPT}").select { |path| Mods.name_of(path) }
+        scripts = listed || Dir.glob("#{FOLDER}/**/*#{SCRIPT}")
+        nested = scripts.select { |path| path.count("/") > 1 && Mods.name_of(path) }
         @deep = nested.empty? || @held.any? { |path| path.count("/") > 1 }
         log("held back #{@held.size} #{@held.size == 1 ? 'script' : 'scripts'} from the game's loader#{@deep ? '' : ', which reads no script in the folders of Patch'}")
       end
@@ -340,9 +343,9 @@ module Mod_Framework
         @deep != false
       end
 
-      # Tells whether the game's loader ran a mod before the framework booted: the hold ended and
-      # saw none of the scripts the loader reads of it, its script at the top of Patch if it has
-      # one, else those in its folder.
+      # Tells whether the game's loader ran a mod before the framework booted: the hold ended, the
+      # loader listed the scripts it reads of the mod, its script at the top of Patch if it has one,
+      # else those in its folder, and the hold saw none of them.
       #
       # @param name [String] The mod's name.
       # @return [Boolean] Whether it ran.
@@ -352,7 +355,23 @@ module Mod_Framework
         script = "#{FOLDER}/#{name}#{SCRIPT}"
         read = File.file?(script) ? [script] : loader_files(name)
         held = @held.map(&:downcase)
-        !read.empty? && read.none? { |file| held.include?(file.downcase) }
+        listed_now = listed
+        listed_now = listed_now.map(&:downcase) if listed_now
+        !read.empty? && read.none? { |file| held.include?(file.downcase) } &&
+          (listed_now.nil? || read.any? { |file| listed_now.include?(file.downcase) })
+      end
+
+      # Lists the scripts of Patch the game's loader listed, as the stub noted them before the
+      # waiting updates moved in.
+      #
+      # A stub of 0.1.0 notes none, and it is the one that runs on the start where Restart now moves
+      # a framework update in.
+      #
+      # @return [Array<String>, nil] Their paths relative to the game folder; nil under a stub that
+      #   notes none.
+      def self.listed
+        boot = defined?(::Mod_Framework::Boot) ? ::Mod_Framework::Boot : nil
+        boot && boot.respond_to?(:listed) ? boot.listed : nil
       end
     end
 

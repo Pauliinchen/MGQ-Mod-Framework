@@ -2,6 +2,7 @@
 //  SiteFeed.cs
 //
 //  Changelog:
+//      Paulinchen  2026-11-11: Asked the website for every live version of each mod
 //      Paulinchen  2026-11-07: Used the bridge and the runtime under the framework's namespace
 //      Paulinchen  2026-11-06: Took the website's address from MGQ_MODS_SITE when it is set
 //                            - Read the list, the details and the answers of the website as plain JSON, without a signature
@@ -49,11 +50,11 @@ internal static class SiteFeed
     public static readonly string Address = Site + "/api/mods";
 
     /// <summary>
-    /// The query that asks for schema 3, which adds each mod's tag, each version's requirements and
-    /// its package of each platform, and the versions without a package for the PC; without it the
-    /// website answers schema 1, as older readers of the list take it.
+    /// The query that asks for schema 4: each mod's tag, each version's requirements and its
+    /// package of each platform, and every live version, so an older copy is recognised; without it
+    /// the website answers schema 1, as older readers of the list take it.
     /// </summary>
-    public const string SchemaQuery = "?schema=3";
+    public const string SchemaQuery = "?schema=4";
 
     /// <summary>
     /// The list's address.

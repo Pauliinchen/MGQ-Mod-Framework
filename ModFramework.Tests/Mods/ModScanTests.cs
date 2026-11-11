@@ -2,6 +2,7 @@
 //  ModScanTests.cs
 //
 //  Changelog:
+//      Paulinchen  2026-11-11: Dropped the check of a mod's own places, which the merge covers for a path through ..
 //      Paulinchen  2026-11-09: Covered a release folder extracted into Patch, whose scripts lie in its own Patch folder
 //      Paulinchen  2026-11-07: Covered a path through .. as no mod's own
 //      Paulinchen  2026-11-06: Covered the website as the only source of mods
@@ -112,15 +113,5 @@ public sealed class ModScanTests
         Assert.Equal(["Pack/Data/data.txt"], removed);
         Assert.Empty(failed);
         Assert.Equal((true, false, false, true), (game.Has("Patch/Pack.rb"), game.Has("Patch/Pack"), game.Has("Patch/Level_Cap.rb"), game.Has("Patch")));
-    }
-
-    /// <summary>
-    /// Asserts that a path through <c>..</c> is no mod's own, so removing a mod never reaches
-    /// another mod's files.
-    /// </summary>
-    [Fact]
-    public void Owns_RefusesAPathThatLeavesTheModsFolder()
-    {
-        Assert.Equal((true, false), (PatchFolder.Owns("Pack", "Pack/Data/data.txt"), PatchFolder.Owns("Pack", "Pack/../Level_Cap.rb")));
     }
 }

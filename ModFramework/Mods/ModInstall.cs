@@ -2,6 +2,7 @@
 //  ModInstall.cs
 //
 //  Changelog:
+//      Paulinchen  2026-11-11: Had a mod wait for the next start while it runs under the name of any of its versions
 //      Paulinchen  2026-11-09: Refused an install whose thread could not start, so another may start
 //      Paulinchen  2026-11-08: Refused to install or update a mod the player installs by hand
 //      Paulinchen  2026-11-07: Had the framework and the mods that run wait for the next start
@@ -61,9 +62,9 @@ internal sealed class ModInstall(Func<BrowsedMod, byte[]> download, Func<Action,
     /// <summary>
     /// Starts installing mods, unless an install runs or one of them is installed by hand.
     /// </summary>
-    /// <param name="mods">The mods, each into its own script and folder in Patch.</param>
+    /// <param name="mods">The mods, every file of each package to its path in Patch.</param>
     /// <param name="gameFolder">The game's folder.</param>
-    /// <param name="running">The names in Patch of the mods that run in the game; these and the framework wait for the next start.</param>
+    /// <param name="running">The names in Patch of the mods that run in the game; a mod running under the name of any of its versions, and the framework, wait for the next start.</param>
     /// <returns>Why it did not start, for the player; <see langword="null"/> once it started.</returns>
     public string? Start(IReadOnlyList<BrowsedMod> mods, string gameFolder, IReadOnlyCollection<string> running)
     {
@@ -94,7 +95,7 @@ internal sealed class ModInstall(Func<BrowsedMod, byte[]> download, Func<Action,
 
         try
         {
-            var waiting = mods.Where(mod => ModUpdates.IsFramework(mod) || running.Contains(mod.Folder, StringComparer.OrdinalIgnoreCase)).Select(mod => mod.Folder).ToList();
+            var waiting = mods.Where(mod => ModUpdates.IsFramework(mod) || mod.Known.Any(version => running.Contains(version.Name, StringComparer.OrdinalIgnoreCase))).Select(mod => mod.Folder).ToList();
             Log.Write($"installing {string.Join(", ", mods.Select(mod => $"{mod.Id} {mod.Latest} as Patch/{mod.Folder}"))}{(waiting.Count > 0 ? $"; {string.Join(", ", waiting)} wait for the next start" : string.Empty)}");
             started = start(() => Run(mods, gameFolder, waiting));
         }

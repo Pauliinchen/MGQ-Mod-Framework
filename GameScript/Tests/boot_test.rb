@@ -2,6 +2,7 @@
 #  boot_test.rb
 #
 #  Changelog:
+#      Paulinchen  2026-11-11: Took the waiting folder from boot_support.rb
 #      Paulinchen  2026-11-07: Checked the waiting updates moved into place at the next start, after a crash too
 #                            - Booted the embedded copy from a mod of no name
 #      Paulinchen  2026-11-06: Removed the check of an install over the old name, which no release had
@@ -82,19 +83,6 @@ in_game_folder do
   check("the .web file takes its place before the pick, the named files go with their markers, a .web file outside Patch stays",
         [*$booted_from.first, Dir.glob("Patch/**/*.{web,remove}").size, File.exist?("Patch/Old_Mod/Old.dll"), File.exist?("Data/Outside.dll.web")],
         [STANDALONE, "0.1.0", true, 0, false, true])
-end
-
-# The waiting folder, which the DLL fills and the stub empties.
-WAITING = "Patch/Mod_Framework/Waiting"
-
-# Writes the waiting folder as the DLL leaves it: each waiting file under its number, then the list.
-#
-# @param lines [Array<String>] The list's lines.
-# @param files [Hash{String => String}] Each waiting file's bytes by its number.
-def put_waiting(lines, files)
-  FileUtils.mkdir_p(WAITING)
-  files.each { |number, bytes| File.binwrite("#{WAITING}/#{number}", bytes) }
-  File.binwrite("#{WAITING}/Waiting.txt", lines.map { |line| "#{line}\n" }.join)
 end
 
 # An update of the framework and of a mod waited; the next start moves them into place before the

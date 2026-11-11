@@ -2,6 +2,7 @@
 #  boot_support.rb
 #
 #  Changelog:
+#      Paulinchen  2026-11-11: Took the waiting folder from the tests of the boot, for the tests of the loader too
 #      Paulinchen  2026-11-07: Booted the framework as any mod that ships a copy does
 #      Paulinchen  2026-11-01: Wrote the lines of Mods.ini without the mark of a tag the player gave
 #      Paulinchen  2026-10-30: Ran the loader the website's installer writes for the untranslated game
@@ -27,6 +28,19 @@ RUBY
 
 # Stands in for the error the game raises when the player presses F12.
 class RGSSReset < Exception; end
+
+# The waiting folder, which the DLL fills and the stub empties.
+WAITING = "Patch/Mod_Framework/Waiting"
+
+# Writes the waiting folder as the DLL leaves it: each waiting file under its number, then the list.
+#
+# @param lines [Array<String>] The list's lines.
+# @param files [Hash{String => String}] Each waiting file's bytes by its number.
+def put_waiting(lines, files)
+  FileUtils.mkdir_p(WAITING)
+  files.each { |number, bytes| File.binwrite("#{WAITING}/#{number}", bytes) }
+  File.binwrite("#{WAITING}/Waiting.txt", lines.map { |line| "#{line}\n" }.join)
+end
 
 # Installs the stub as Patch/!Mod_Framework.rb in the current game folder.
 def install_stub

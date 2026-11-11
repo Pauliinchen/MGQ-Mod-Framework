@@ -10,6 +10,19 @@ when it has more files: `Patch/Camp_Notes.rb` and `Patch/Camp_Notes/`. The frame
 from its first line. `Mod_Framework::Mods` tells when your mod loads, starts the game again, and
 installs and updates mods of the website.
 
+## Your package
+
+- Your mod is its package: every file your zip or script puts into `Patch` is your mod's, whatever
+  its name, and installs, updates and goes away with it. An update also removes the files of your
+  older versions that the player has not changed, such as a script you renamed.
+- A zip holds your files as they lie in `Patch`, or laid out like the game folder under `Patch/`.
+  Then only the files under `Patch/` are installed, and a changelog beside it stays out.
+- A package is at most one mod to the loader: one script at the top, or one folder of scripts
+  alone; a package of pictures without scripts is fine too. Its name in the Mod List and `Mods.ini`
+  is that script's name, such as `0_Camp_Notes` for `0_Camp_Notes.rb`.
+- No package may hold the game's loader `Patch.rb` or the framework's files (`!Mod_Framework.rb`,
+  `Mod_Framework/`). The website refuses such an upload, and one that is two mods to the loader.
+
 ## Your files
 
 - The framework loads each mod under its own file name: `__FILE__` is `"Patch/Camp_Notes.rb"`.

@@ -2,7 +2,9 @@
 //  ModsTopics.Browse.cs
 //
 //  Changelog:
-//      Paulinchen  2026-11-11: Turned a collection on in its order in one write and told which other mods are on, its needs kept
+//      Paulinchen  2026-11-11: Told the version of a mod installed in part as unknown, as the Mods List does
+//                            - Kept a mod of a collection installed in part an update whatever version the collection names
+//                            - Turned a collection on in its order in one write and told which other mods are on, its needs kept
 //                            - Told the mods of the website an install of a mod also brings, through the mods those need
 //                            - Found a mod by a name whatever the picks of the filters
 //      Paulinchen  2026-11-08: Told which mods the player installs and updates by hand and left them out of the updates
@@ -67,7 +69,7 @@ internal sealed partial class ModsTopics
     /// as in the game folder: {"id", "name", "author", "source", "page", "summary",
     /// "tag", "by_hand" (whether the player installs and updates it by hand from its page on the
     /// website, see <see cref="BrowsedMod.ByHand"/>), "brings" => [id, ...] (the mods of the website an install also needs, as
-    /// <see cref="BringsOf"/> finds them), "status" (see <see cref="ModStatus"/>), "installed" (the known version installed or
+    /// <see cref="BringsOf"/> finds them), "status" (see <see cref="ModStatus"/>), "installed" (the known version installed whole, "?" for one in part, or
     /// nil), "place" (where it lies: "Patch", or "" while not installed), "folder" (its name in
     /// Patch and in Mods.ini), "on" (nil while not installed), "latest",
     /// "bytes", "files", "notes" => [line, ...], "picture" (the cached image's path or nil),
@@ -519,7 +521,7 @@ internal sealed partial class ModsTopics
 
     /// <summary>
     /// Removes the installed versions of mods: their updates that wait for the next start, the files
-    /// of their own scripts and folders still exactly theirs, and the folders that leaves empty.
+    /// of their known versions still exactly a version's, and the folders that leaves empty.
     /// </summary>
     /// <param name="request">The mods' ids, see <see cref="RemoveTopic"/>.</param>
     /// <returns>The names of the mods removed, and why one could not be.</returns>
@@ -601,7 +603,7 @@ internal sealed partial class ModsTopics
             { "by_hand", mod.ByHand },
             { "brings", BringsOf(mod, plan, known) },
             { "status", state.Status },
-            { "installed", state.Installed?.Version },
+            { "installed", InstalledVersionOf(state) },
             { "place", installed?.Mod.Place ?? (state.Installed != null ? PatchFolder.Name : string.Empty) },
             { "folder", installed?.Mod.Name ?? mod.Folder },
             { "on", installed == null ? RubyNil.Value : (RubyValue)installed.On },
@@ -818,7 +820,7 @@ internal sealed partial class ModsTopics
                 { "other_platform", mod == null && elsewhere.Any(each => each.Slug == entry.Slug) },
                 { "by_hand", mod?.ByHand ?? elsewhere.Any(each => each.Slug == entry.Slug && ModTag.ByHand(each.Tag)) },
                 { "status", mod == null ? ModStatus.Available : StatusFor(states[mod.Id], entry.Version) },
-                { "installed", mod == null ? null : states[mod.Id].Installed?.Version },
+                { "installed", mod == null ? null : InstalledVersionOf(states[mod.Id]) },
                 { "folder", installed?.Mod.Name ?? mod?.Folder },
                 { "on", installed == null ? RubyNil.Value : (RubyValue)installed.On },
             });
@@ -837,16 +839,23 @@ internal sealed partial class ModsTopics
     }
 
     /// <summary>
-    /// Tells how a mod of a collection stands: an update whose installed version is at least the
-    /// version the collection names is current.
+    /// Tells how a mod of a collection stands: an update whose version installed whole is at least
+    /// the version the collection names is current.
     /// </summary>
     /// <param name="state">How the mod stands, see <see cref="ModScan.Detect"/>.</param>
     /// <param name="least">The version the collection names; empty for the latest.</param>
     /// <returns>See <see cref="ModStatus"/>.</returns>
     private static string StatusFor(ModState state, string least) =>
-        state.Status == ModStatus.Update && least.Length > 0 && state.Installed is { } installed && ModMerge.CompareVersions(installed.Version, least) >= 0
+        state.Status == ModStatus.Update && !state.Repair && least.Length > 0 && state.Installed is { } installed && ModMerge.CompareVersions(installed.Version, least) >= 0
             ? ModStatus.Current
             : state.Status;
+
+    /// <summary>
+    /// Tells the version of a mod the browser shows as installed, as the Mods List tells it.
+    /// </summary>
+    /// <param name="state">How the mod stands, see <see cref="ModScan.Detect"/>.</param>
+    /// <returns>The version installed whole; <see cref="InstalledMod.Unknown"/> for one in part; <see langword="null"/> when none is.</returns>
+    private static string? InstalledVersionOf(ModState state) => state.Repair ? InstalledMod.Unknown : state.Installed?.Version;
 
     /// <summary>
     /// Reads the website's collections of the cache, again only once its file changed.
