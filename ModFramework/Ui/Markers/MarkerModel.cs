@@ -2,6 +2,8 @@
 //  MarkerModel.cs
 //
 //  Changelog:
+//      Paulinchen  2026-11-11: Left the triangle's rows out of a marker's place, which draws the arrow's rows shifted
+//                            - Laid out an arrow by its angle alone at the one size of a marker's triangle
 //      Paulinchen  2026-11-09: Kept a marker's own margin from each edge of the screen
 //      Paulinchen  2026-11-07: Used the bridge and the runtime under the framework's namespace
 //      Paulinchen  2026-10-31: Created
@@ -27,9 +29,7 @@ namespace MGQParadox.ModFramework.Ui.Markers;
 /// <param name="PlateY">The plate's top in the picture.</param>
 /// <param name="SlideX">Pixels the marker slides in from as it fades in, x.</param>
 /// <param name="SlideY">Pixels the marker slides in from as it fades in, y.</param>
-/// <param name="Rows">The triangle's rows in the picture, each its x, y, width and whether it is
-/// the fill (1) or one of the outline's passes (0), in the order they are drawn.</param>
-internal sealed record MarkerPicture(int Left, int Top, int Width, int Height, int PlateX, int PlateY, int SlideX, int SlideY, IReadOnlyList<(int X, int Y, int Width, int Fill)> Rows);
+internal sealed record MarkerPicture(int Left, int Top, int Width, int Height, int PlateX, int PlateY, int SlideX, int SlideY);
 
 /// <summary>
 /// The geometry of the markers at the screen's edge and of the arrows they draw with: where the
@@ -41,12 +41,14 @@ internal static class MarkerModel
     /// <summary>
     /// Places a marker: [from x, from y, to x, to y, screen width, screen height, room at the top,
     /// margin at the top, the right, the bottom and the left, plate width]; answers [x, y, the angle stepped, picture left, top, width, height,
-    /// plate x, plate y, slide x, slide y, rows], nil for two equal spots.
+    /// plate x, plate y, slide x, slide y], nil for two equal spots; the marker draws the triangle of
+    /// <see cref="ArrowTopic"/> at its angle.
     /// </summary>
     public const string PlaceTopic = "ui.marker.place";
 
     /// <summary>
-    /// Lays out an arrow: [angle, length, base width]; answers [left, top, width, height, rows].
+    /// Lays out an arrow of a marker's triangle, <see cref="Length"/> long and <see cref="Width"/>
+    /// wide: [angle]; answers [left, top, width, height, rows].
     /// </summary>
     public const string ArrowTopic = "ui.marker.arrow";
 
@@ -157,8 +159,8 @@ internal static class MarkerModel
     public static int StepAngle(int angle) => Round(angle / (double)AngleStep) * AngleStep;
 
     /// <summary>
-    /// Lays out a marker's picture: the triangle pointing along the angle around the picture's
-    /// origin, its outline, and the plate on the side away from the edge, clear of the triangle by
+    /// Lays out a marker's picture: room for the triangle pointing along the angle around the
+    /// picture's origin, and the plate on the side away from the edge, clear of the triangle by
     /// <see cref="PlateGap"/>.
     /// </summary>
     /// <param name="angle">The stepped angle in degrees.</param>
@@ -180,7 +182,7 @@ internal static class MarkerModel
         int right = (int)Math.Ceiling(Math.Max(reach, plateLeft + plateWidth));
         int bottom = (int)Math.Ceiling(Math.Max(reach, plateTop + PlateHeight));
         return new MarkerPicture(left, top, right - left, bottom - top, Round(plateLeft - left), Round(plateTop - top),
-            Round(ux * SlidePixels), Round(uy * SlidePixels), TriangleRows(-left, -top, ux, uy, Length, Width));
+            Round(ux * SlidePixels), Round(uy * SlidePixels));
     }
 
     /// <summary>
@@ -256,7 +258,6 @@ internal static class MarkerModel
         return new RubyArray
         {
             at.X, at.Y, angle, picture.Left, picture.Top, picture.Width, picture.Height, picture.PlateX, picture.PlateY, picture.SlideX, picture.SlideY,
-            RowsOf(picture.Rows),
         };
     }
 
@@ -268,7 +269,7 @@ internal static class MarkerModel
     private static RubyValue Arrow(RubyArray request)
     {
         (int left, int top, int width, int height, List<(int X, int Y, int Width, int Fill)> rows) =
-            ArrowRows(request[0].AsInt(), Math.Max(request[1].AsInt(), 1), Math.Max(request[2].AsInt(), 1));
+            ArrowRows(request[0].AsInt(), Length, Width);
         return new RubyArray { left, top, width, height, RowsOf(rows) };
     }
 

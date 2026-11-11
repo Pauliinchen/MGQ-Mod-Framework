@@ -2,6 +2,7 @@
 //  MarkerModelTests.cs
 //
 //  Changelog:
+//      Paulinchen  2026-11-11: Checked the place without the triangle's rows and the arrow by its angle alone
 //      Paulinchen  2026-11-09: Gave the place topic a margin for each edge of the screen
 //      Paulinchen  2026-11-07: Wrote the cases of the place and the angle in the tests and dropped the replay of the pictures
 //                            - Used the bridge and the runtime under the framework's namespace
@@ -60,8 +61,8 @@ public sealed class MarkerModelTests
 
     /// <summary>
     /// Asserts that an arrow alone fills its triangle inside its picture, the outline first, and
-    /// that the topics answer the place, kept from each edge by its own margin, and the arrow, nil for
-    /// two equal spots.
+    /// that the topics answer the place without the triangle's rows, kept from each edge by its own
+    /// margin, nil for two equal spots, and the marker's triangle by its angle alone.
     /// </summary>
     [Fact]
     public void ArrowAndTopics_AnswerThePictureAndThePlace()
@@ -76,7 +77,10 @@ public sealed class MarkerModelTests
         MarkerModel.Register(ui.Context);
         RubyArray placed = ui.Value(MarkerModel.PlaceTopic, new RubyArray { 320, 224, 900, 224, ScreenWidth, ScreenHeight, 0, 14, 30, 14, 14, 44 }).AsArray();
         Assert.Equal([610, 224, 0], placed.Take(3).Select(value => value.AsInt()));
+        Assert.Equal(11, placed.Count);
         Assert.True(ui.Value(MarkerModel.PlaceTopic, new RubyArray { 1, 1, 1, 1, ScreenWidth, ScreenHeight, 0, 14, 14, 14, 14, 44 }).IsNil);
-        Assert.Equal(5, ui.Value(MarkerModel.ArrowTopic, new RubyArray { 0, 14, 12 }).AsArray().Count);
+        RubyArray arrow = ui.Value(MarkerModel.ArrowTopic, new RubyArray { 90 }).AsArray();
+        Assert.Equal([-11, -11, 23, 23], arrow.Take(4).Select(value => value.AsInt()));
+        Assert.Equal(rows.Count, arrow[4].AsArray().Count);
     }
 }

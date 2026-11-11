@@ -2,6 +2,8 @@
 #  markers.rbx
 #
 #  Changelog:
+#      Paulinchen  2026-11-11: Drew a marker's triangle from the arrow of its angle, so its place carries no rows
+#                            - Removed an arrow's :triangle, which no caller set, so C# alone keeps its size
 #      Paulinchen  2026-11-07: Wrote the plain text of a bubble by contrast with its fill only under contrast
 #                            - Removed add_arrow of the old API
 #      Paulinchen  2026-11-06: Drew a bubble's body a little see-through and what it holds whole
@@ -32,19 +34,17 @@ module Mod_Framework
         # The color of an arrow's outline: the solid outline of the texts.
         OUTLINE = Style::OUTLINE
 
-        # The arrows laid out, by angle, length and base width.
+        # The arrows laid out, by angle.
         @arrows = {}
 
-        # Lays out an arrow: a triangle pointing along an angle with its outline.
+        # Lays out an arrow: a marker's triangle pointing along an angle with its outline, its size
+        # kept in C#.
         #
         # @param angle [Integer] Degrees, 0 to the right and 90 down.
-        # @param length [Integer] Pixels from its base to its tip.
-        # @param width [Integer] Pixels across its base.
         # @return [Array, nil] The picture's left and top from the triangle's center, its width and
-        #   height, and its rows ([x, y, width, fill]); nil without the DLL.
-        def self.arrow(angle, length, width)
-          key = [angle.to_i, length.to_i, width.to_i]
-          @arrows[key] ||= Mod_Framework.available? ? Mod_Framework.bridge.call(ARROW, key) : nil
+        #   height, and its rows ([x, y, width, fill]); nil without the DLL or when the call failed.
+        def self.arrow(angle)
+          @arrows[angle.to_i] ||= Mod_Framework.available? ? Mod_Framework.bridge.call(ARROW, [angle.to_i]) : nil
         end
 
         # Places a marker, see MarkerModel.PlaceTopic.
@@ -55,8 +55,7 @@ module Mod_Framework
         #   right, bottom and left.
         # @param plate_width [Integer] Its plate's width.
         # @return [Array, nil] x, y, the angle stepped, the picture's left, top, width and height, the
-        #   plate's x and y, the slide's x and y and the rows; nil for two equal spots or without the
-        #   DLL.
+        #   plate's x and y and the slide's x and y; nil for two equal spots or without the DLL.
         def self.place(from, to, margin, plate_width)
           return nil unless Mod_Framework.available?
 
@@ -76,25 +75,25 @@ module Mod_Framework
       end
 
       # A filled triangle pointing along an angle in degrees (0 right, 90 down), with the solid
-      # outline, :triangle long and wide.
+      # outline, as large as a marker's.
       class Arrow < Component
         include StateBlind
 
-        # Tells the defaults of the options: pointing right in the text color, 14 long and 12 wide.
+        # Tells the defaults of the options: pointing right in the text color.
         #
         # @return [Hash] The defaults.
         def self.defaults
-          super.merge(:angle => 0, :color => :text, :triangle => [14, 12])
+          super.merge(:angle => 0, :color => :text)
         end
 
-        # Tells which properties of C#'s tree each option sets: another shape measures anew.
+        # Tells which properties of C#'s tree each option sets: another angle measures anew.
         #
         # @return [Hash{Symbol => Array<String>}] The properties by option.
         def self.node_keys
-          super.merge(:triangle => ["measured"], :angle => ["measured"])
+          super.merge(:angle => ["measured"])
         end
 
-        options :angle, :color, :triangle
+        options :angle, :color
 
         # Tells its size: its picture's, the outline included.
         #
@@ -120,8 +119,7 @@ module Mod_Framework
         #
         # @return [Array, nil] See Markers.arrow.
         def laid_out
-          length, width = Array(@options[:triangle])
-          Markers.arrow(@options[:angle].to_i, (length || 14).to_i, (width || 12).to_i)
+          Markers.arrow(@options[:angle].to_i)
         end
       end
 
@@ -349,13 +347,14 @@ module Mod_Framework
           props
         end
 
-        # Draws its triangle and its plate with its text.
+        # Draws its triangle, the arrow of its angle placed in its picture, and its plate with its text.
         #
         # @param canvas [Canvas] Where it draws.
         def draw(canvas)
           return unless @placed
 
-          Markers.fill(canvas, @placed[11], @options[:color])
+          arrow = Markers.arrow(@placed[2])
+          Markers.fill(canvas, arrow[4], @options[:color], arrow[0] - @placed[3], arrow[1] - @placed[4]) if arrow
           text = @options[:text].to_s
           return if text.empty?
 

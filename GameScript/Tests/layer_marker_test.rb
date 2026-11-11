@@ -2,6 +2,7 @@
 #  layer_marker_test.rb
 #
 #  Changelog:
+#      Paulinchen  2026-11-11: Checked that a marker draws its triangle from the arrow of its angle, moved into its picture
 #      Paulinchen  2026-11-06: Let the compass needle point right, as an arrow takes no angle
 #                            - Called the engine's classes by their names under UI::Engine
 #      Paulinchen  2026-11-05: Created
@@ -83,7 +84,7 @@ in_game_folder do
   arrows = []
   fake.answer("ui.marker.arrow") { |request| arrows << request; [-5, -5, 11, 11, [[0, 0, 3, 0], [1, 0, 1, 1]]] }
   places = []
-  fake.answer("ui.marker.place") { |request| places << request; [626, 224, 0, -11, -11, 23, 23, -40, 1, -10, 0, [[0, 0, 4, 1]]] }
+  fake.answer("ui.marker.place") { |request| places << request; [626, 224, 0, -11, -11, 23, 23, -40, 1, -10, 0] }
   boot_tree(fake) do
     ui = Mod_Framework::UI
     load_mod("Patch/Camp_Marks.rb", CAMP_MARKS)
@@ -102,6 +103,9 @@ in_game_folder do
     check("the marker at the edge toward the shrine [shows, its place]", [marker.visible?, marker.at], [true, [615, 213]])
     check("the line it asked C# for [from, to, margin]", places.last.values_at(0, 1, 2, 3, 7), [320, 224, 900, 224, 14])
     check("its plate holds the text", places.last[8] > 0, true)
+    Graphics.update
+    check("its triangle drawn from the arrow C# laid out for its angle, moved to its place in the marker's picture [the arrow asked, the rows]",
+          [arrows.last, marker.base_surface.bitmap.fills.first(2).map { |each| each[0, 4] }], [[0], [[6, 6, 3, 1], [7, 6, 1, 1]]])
 
     # The distance on its plate follows the mod's count.
     $camp_tiles = 11
@@ -122,7 +126,7 @@ in_game_folder do
     ui.show(Camp_Marks::Compass)
     frame
     Graphics.update
-    check("the arrow C# laid out [angle, length, width]", arrows.last, [0, 14, 12])
+    check("the arrow C# laid out [angle]", arrows.last, [0])
     hud = ui::Engine::Layer.tops.last.root.engine
     tree.rects[hud.find(:camp_needle).node] = [0, 0, 11, 11]
     frame
