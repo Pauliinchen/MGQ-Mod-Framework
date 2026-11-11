@@ -12,7 +12,7 @@
     <AssemblyName>ModFramework</AssemblyName>
     <RootNamespace>MGQParadox.ModFramework</RootNamespace>
     <Product>MGQ Paradox Mod Framework</Product>
-    <Version>0.1.0-dev</Version>
+    <Version>0.1.1-dev</Version>
 
     <!-- The handshake's build and the loader's Version.txt are this version as it is, without the
          commit the SDK would append. -->
