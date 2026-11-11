@@ -2,7 +2,8 @@
 #  mods_loader.rbx
 #
 #  Changelog:
-#      Paulinchen  2026-11-11: Read the database again once a mod wrapped DataManager.load_normal_database too
+#      Paulinchen  2026-11-11: Added Mods.load_late, which loads scripts once the game runs through the traps of a late load
+#                            - Read the database again once a mod wrapped DataManager.load_normal_database too
 #      Paulinchen  2026-11-09: Logged the scripts and framework copies in a Patch folder inside Patch and named their folders in a message
 #      Paulinchen  2026-11-08: Forgot the remembered hotkeys of the mods that loaded once the boot and the entering loaded them
 #      Paulinchen  2026-11-07: Named the mods in use, whose updates wait for the next start
@@ -145,6 +146,18 @@ module Mod_Framework
     # @return [Boolean] Whether this call entered, false when the game was entered before.
     def self.enter(reason, options = {})
       Loader.enter(reason.to_s, options[:only] && Array(options[:only]).map(&:to_s))
+    end
+
+    # Loads scripts once the game runs through the traps of a late load, as entering loads the
+    # mods: the SceneManager.run wrappers they set up run once, and the database is read again
+    # once one of them wrapped its read. For scripts the framework does not load itself, such as
+    # those a server evaluates for each battle.
+    #
+    # @param reason [String] What loads them, for the log.
+    # @yield Loads the scripts, such as by evaluating them.
+    # @return [Object] What the block answered; nil when it failed, which is logged.
+    def self.load_late(reason, &block)
+      Loader.load_late(reason.to_s, block)
     end
 
     # Tells whether a mod runs until the game starts again, whatever the player turns off or a
@@ -536,21 +549,46 @@ module Mod_Framework
         log("#{reason} enters with only these mods besides the Framework mods: #{only.empty? ? 'none' : only.join(', ')}") if only
         started = Time.now
         plan = Mods.plan
-        database = database_state
         loaded = []
-        set_up_runs do
+        _value, wrapped = load_with_traps do
           loaded.concat(load_boot_mods(pending(plan, BOOT_TAGS)))
           run_enter_blocks
           loaded.concat(load_mods(pending(plan, ENTERING_TAGS)))
         end
         Hotkeys.forget_undefined(@loaded.select { |name| running?(name) })
         data = loaded.any? { |_name, tag| tag == DATA }
-        reread = data || database_state != database ? read_database : nil
+        reread = data || wrapped ? read_database : nil
         log("#{reason} entered the game in #{((Time.now - started) * 1000).round} ms: loaded #{described(loaded)}#{reread ? ", #{reread}" : ''}")
         true
       rescue => e
         log("#{reason} entered the game, but loading the mods failed: #{Logging.failure(e)} at #{Array(e.backtrace).first}")
         true
+      end
+
+      # Loads scripts late, see Mods.load_late.
+      #
+      # @param reason [String] What loads them.
+      # @param block [Proc] Loads them.
+      # @return [Object] What the block answered.
+      def self.load_late(reason, block)
+        started = Time.now
+        value, wrapped = load_with_traps(&block)
+        reread = wrapped ? read_database : nil
+        log("#{reason} loaded scripts late in #{((Time.now - started) * 1000).round} ms#{reread ? ", #{reread}" : ''}")
+        value
+      end
+
+      # Runs a block that loads scripts once the game runs through set_up_runs, and tells whether
+      # what reading the database runs changed meanwhile.
+      #
+      # @yield Loads the scripts.
+      # @return [Array(Object, Boolean)] What the block answered, and whether a script wrapped a
+      #   read of the database.
+      def self.load_with_traps
+        database = database_state
+        value = nil
+        set_up_runs { value = yield }
+        [value, database_state != database]
       end
 
       # Tells whether the player entered the game.

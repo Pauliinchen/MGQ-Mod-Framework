@@ -2,7 +2,8 @@
 #  mods_loader_test.rb
 #
 #  Changelog:
-#      Paulinchen  2026-11-11: Had Level_Cap wrap load_normal_database, as the Unified Bugfix Module does
+#      Paulinchen  2026-11-11: Covered scripts loaded late through Mods.load_late
+#                            - Had Level_Cap wrap load_normal_database, as the Unified Bugfix Module does
 #      Paulinchen  2026-11-09: Covered a script in Patch/Patch, which is logged and named in a message
 #                            - Covered a release folder extracted into Patch, which is no mod
 #      Paulinchen  2026-11-06: Covered a mod that calls the old UI, which stops at its NameError and is named in a message
@@ -17,10 +18,10 @@
 #----------------------------------------------------------------
 
 # Covers mods_loader.rbx in a booted game without the DLL, the order coming from Mods.ini: a game
-# session from the boot through the title to New Game with the traps of a late load, a folder mod
-# under the Russian translation's loader, a world that leaves the other mods out, a Title mod
-# that embeds the framework, a mod that calls a name the framework no longer has, and mods
-# extracted into Patch/Patch and into a release folder's Patch inside Patch.
+# session from the boot through the title to New Game with the traps of a late load and a script
+# loaded late after it, a folder mod under the Russian translation's loader, a world that leaves
+# the other mods out, a Title mod that embeds the framework, a mod that calls a name the framework
+# no longer has, and mods extracted into Patch/Patch and into a release folder's Patch inside Patch.
 
 require_relative "mods_loader_support"
 require_relative "tree_support"
@@ -72,8 +73,23 @@ MODS = {
 # The order and tags of the first game's mods.
 MODS_INI = "Core=on Framework\nMenu=on Title\nBroken=on Regular\nHero=on Regular\nLevel_Cap=on Regular\n"
 
+# A script loaded once the game runs, outside the framework's loading, that wraps SceneManager.run
+# and the database's read as Level_Cap does.
+LATE_SCRIPT = <<-RUBY
+  $late_set_up = 0
+  class << SceneManager
+    alias late_run run
+    def run; $late_set_up += 1; late_run; end
+  end
+  class << DataManager
+    alias late_load_normal_database load_normal_database
+    def load_normal_database; late_load_normal_database; $late_notes = true; end
+  end
+RUBY
+
 # A game session: the boot holds the mods back, the title loads the Framework and Title mods, a
-# Title mod's command loads its part, and New Game loads the rest through the traps of a late load.
+# Title mod's command loads its part, New Game loads the rest through the traps of a late load, and
+# a script loaded late afterwards goes through the same traps.
 in_game_folder do
   boot_with_mods(MODS, MODS_INI)
   mods = Mod_Framework::Mods
@@ -97,6 +113,11 @@ in_game_folder do
   ran = false
   mods.on_enter("late") { ran = true }
   check("once entered an on_enter block runs at once and entering again does nothing", [ran, mods.enter("again")], [true, false])
+  run = SceneManager.singleton_class.instance_method(:run)
+  reads = $database_reads
+  value = mods.load_late("a server's battle") { eval(LATE_SCRIPT, TOPLEVEL_BINDING, "Late.rb"); 1 }
+  check("a script loaded late sets its SceneManager.run wrapper up once, the database is read again for its wrap, and the real run is back",
+        [$late_set_up, $database_reads - reads, $late_notes, SceneManager.singleton_class.instance_method(:run) == run, value], [1, 1, true, true, 1])
 end
 
 # Under the Russian translation's loader a folder mod, a folder of scripts in Patch with no script

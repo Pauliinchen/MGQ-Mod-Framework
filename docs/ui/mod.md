@@ -70,6 +70,10 @@ end
   way sets up or loads the game; `only:` names the mods of the session, such as a world's.
   `Mods.stays_on` lists the mods that run from the start and stay, `Mods.running?(name)` tells it of
   one.
+- `Mods.load_late(reason) { }`: a block that loads scripts the framework does not load itself, once
+  the game runs, such as by `eval`, goes through the same steps as entering: the `SceneManager.run`
+  wrappers set up once and the database is read again when a script wrapped its read. It answers
+  the block's value.
 
 ## Back to the title starts the game again
 
