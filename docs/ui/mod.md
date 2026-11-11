@@ -37,9 +37,10 @@ is written into the log and named in the Mod List; the others load all the same.
 
 A Default mod loads after the game started, and the framework takes care of what that changes:
 the `SceneManager.run` wrappers a mod sets up run once, the game reads its database again once the
-mods loaded when a Data mod loaded or a mod hooked `DataManager.load_database`, the New Game or the
-load that entered runs again, and hooks, hotkeys, options and `Run.on_start` blocks registered then
-take effect at once. A mod that changes the title screen must be a Title mod.
+mods loaded when a Data mod loaded or a mod hooked `DataManager.load_database` or
+`load_normal_database`, the New Game or the load that entered runs again, and hooks, hotkeys,
+options and `Run.on_start` blocks registered then take effect at once. A mod that changes the title
+screen must be a Title mod.
 
 ## Title mods
 

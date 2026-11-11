@@ -2,6 +2,7 @@
 #  mods_loader.rbx
 #
 #  Changelog:
+#      Paulinchen  2026-11-11: Read the database again once a mod wrapped DataManager.load_normal_database too
 #      Paulinchen  2026-11-09: Logged the scripts and framework copies in a Patch folder inside Patch and named their folders in a message
 #      Paulinchen  2026-11-08: Forgot the remembered hotkeys of the mods that loaded once the boot and the entering loaded them
 #      Paulinchen  2026-11-07: Named the mods in use, whose updates wait for the next start
@@ -397,6 +398,10 @@ module Mod_Framework
 
       # The most characters of why a mod failed that the settings keep.
       FAILED_LENGTH = 200
+
+      # The methods of DataManager that reading the database runs, the game's load_database calling
+      # load_normal_database; a mod that wraps either changes what the read gives.
+      DATABASE_READS = [:load_database, :load_normal_database]
 
       # The managed mods loaded, in the order they loaded.
       @loaded = []
@@ -844,15 +849,16 @@ module Mod_Framework
         end
       end
 
-      # Tells what reading the database runs: the method and the framework's hooks of it, which a
-      # mod that wraps it changes.
+      # Tells what reading the database runs: each of its methods and the framework's hooks of it,
+      # which a mod that wraps it changes.
       #
-      # @return [Array, nil] The method and how many hooks follow it; nil without DataManager.
+      # @return [Array, nil] Each method DataManager has and how many hooks follow it; nil without
+      #   DataManager.
       def self.database_state
         return nil unless defined?(::DataManager) && ::DataManager.respond_to?(:load_database)
 
         owner = ::DataManager.singleton_class
-        [owner.instance_method(:load_database), Hooks.hooked(owner, :load_database)]
+        DATABASE_READS.select { |name| ::DataManager.respond_to?(name) }.map { |name| [owner.instance_method(name), Hooks.hooked(owner, name)] }
       end
 
       # Reads the game's database again, so the wrappers of the mods that loaded run on it.

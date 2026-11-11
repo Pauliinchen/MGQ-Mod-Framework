@@ -2,6 +2,7 @@
 #  mods_loader_test.rb
 #
 #  Changelog:
+#      Paulinchen  2026-11-11: Had Level_Cap wrap load_normal_database, as the Unified Bugfix Module does
 #      Paulinchen  2026-11-09: Covered a script in Patch/Patch, which is logged and named in a message
 #                            - Covered a release folder extracted into Patch, which is no mod
 #      Paulinchen  2026-11-06: Covered a mod that calls the old UI, which stops at its NameError and is named in a message
@@ -62,8 +63,8 @@ MODS = {
       def run; $level_cap_set_up += 1; level_cap_run; end
     end
     class << DataManager
-      alias level_cap_load_database load_database
-      def load_database; level_cap_load_database; $level_cap_notes = true; end
+      alias level_cap_load_normal_database load_normal_database
+      def load_normal_database; level_cap_load_normal_database; $level_cap_notes = true; end
     end
   RUBY
 }
@@ -91,7 +92,7 @@ in_game_folder do
   check("a failing mod is named with why while the others go on", [mods.failed["Broken"].include?("Patch/Broken.rb: RuntimeError: broken on purpose"), mods.loaded],
         [true, %w[Core Menu Hero Level_Cap]])
   check("a wrapper of SceneManager.run sets up once without counting as a run", [$level_cap_set_up, $runs_after], [1, 1])
-  check("the database is read again for a mod that wrapped its read", $level_cap_notes, true)
+  check("the database is read again once for a mod that wrapped load_normal_database", [$database_reads, $level_cap_notes], [1, true])
   check("New Game runs again for a mod that wrapped it while the game is set up once", [$hero_chosen, $new_games], [true, 1])
   ran = false
   mods.on_enter("late") { ran = true }

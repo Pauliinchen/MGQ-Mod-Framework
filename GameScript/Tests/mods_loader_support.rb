@@ -2,6 +2,7 @@
 #  mods_loader_support.rb
 #
 #  Changelog:
+#      Paulinchen  2026-11-11: Read the database through load_normal_database as the game does
 #      Paulinchen  2026-10-30: Created
 #
 #----------------------------------------------------------------
@@ -14,7 +15,7 @@ require_relative "game_lists_support"
 
 # Defines the game's scenes and DataManager's ways into the game as far as the loader follows them:
 # the title with its command window, New Game, the load of a save and the translation's load of an
-# autosave, counting what they do.
+# autosave, and the database's read through load_normal_database, counting what they do.
 def define_scenes
   [:Scene_AutoSave_Load, :Scene_Load, :Scene_File, :Scene_Title, :Scene_Base].each { |name| Object.send(:remove_const, name) if Object.const_defined?(name) }
   Object.class_eval <<-RUBY
@@ -32,7 +33,8 @@ def define_scenes
     class Scene_Load < Scene_File; def on_savefile_ok; super; DataManager.load_game(0); end; end
     class Scene_AutoSave_Load < Scene_Load; def on_savefile_ok; DataManager.load_game("01"); end; end
     module DataManager
-      def self.load_database; $database_reads += 1; end
+      def self.load_database; load_normal_database; end
+      def self.load_normal_database; $database_reads += 1; end
       def self.setup_new_game; $new_games += 1; end
       def self.load_game(index); $loads << index; load_game_without_rescue(index); end
     end
