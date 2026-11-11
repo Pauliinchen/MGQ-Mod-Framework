@@ -29,6 +29,12 @@ jobs:
         with:
           ref: ${{ env.TAG }}
 
+      # The Mod Collection owns the Equipment Window; the zips take its latest release's copy.
+      - name: Take the Equipment Window from the Mod Collection's latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download --repo Pauliinchen/MGQ-Paradox-Mod-Collection --pattern Equipment_Window.rb --dir Bundled
+
       - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: 10.0.x
@@ -45,16 +51,17 @@ jobs:
           "VERSION=$version" | Out-File $env:GITHUB_ENV -Append -Encoding utf8
 
       # The zips bring the first copy of the Equipment Window, its own mod on the website. A copy no
-      # website version holds leaves every new player with a changed copy the Browser cannot remove.
+      # website version holds leaves every new player with a changed copy the Browser cannot remove,
+      # so the release fails until the website lists the Collection's copy.
       - name: Check that the Equipment Window is a version on the website
         shell: pwsh
         run: |
-          $bytes = [IO.File]::ReadAllBytes("Samples/Equipment_Window.rb")
+          $bytes = [IO.File]::ReadAllBytes("Bundled/Equipment_Window.rb")
           $sha = [Security.Cryptography.SHA256]::Create()
           $hashes = @($bytes, [byte[]]@($bytes | Where-Object { $_ -ne 13 })) | ForEach-Object { [BitConverter]::ToString($sha.ComputeHash($_)).Replace("-", "").ToLower() }
           $mod = try { (Invoke-RestMethod "https://mgqonline.org/api/mods/equipment-window?schema=3").mod } catch { $null }
           $listed = @($mod.versions | Where-Object { $_.files | Where-Object { $_.path -eq "Equipment_Window.rb" -and $hashes -contains $_.sha256 } })
-          if (-not $listed) { "::warning::Samples/Equipment_Window.rb is no version of equipment-window on the website. Upload it there as a new version." }
+          if (-not $listed) { throw "The Mod Collection's Equipment_Window.rb is no version of equipment-window on the website. Import it there as a new version first." }
           else { "Equipment_Window.rb is version $($listed[0].version) of equipment-window on the website." }
 
       - name: Test the scripts
@@ -103,6 +110,11 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: ${{ env.TAG }}
+
+      - name: Take the Equipment Window from the Mod Collection's latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download --repo Pauliinchen/MGQ-Paradox-Mod-Collection --pattern Equipment_Window.rb --dir Bundled
 
       - uses: actions/setup-dotnet@v6
         with:

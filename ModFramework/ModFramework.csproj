@@ -78,9 +78,11 @@
     <ScriptFile Include="..\GameScript\Mod_Framework\Scripts\*.rbx" />
     <GraphicFile Include="..\GameScript\Mod_Framework\Graphics\*.png" />
 
-    <!-- The first copy of a mod of its own that the zip brings into the Patch folder. The website
-         lists it as its own mod, which owns its updates, so it is no file of the framework. -->
-    <BundledModFile Include="..\Samples\Equipment_Window.rb" />
+    <!-- The first copy of a mod of its own that the zip brings into the Patch folder: the Mod
+         Collection's released Equipment Window, put into the gitignored Bundled folder before a
+         build. The website lists it as its own mod, which owns its updates, so it is no file of
+         the framework. -->
+    <BundledModFile Include="..\Bundled\Equipment_Window.rb" />
 
     <!-- Manifest.txt lists every file of the framework a release ships, so an updater can remove
          what a later release drops. Mod_Framework.ini and the bundled mods are never in it, so no

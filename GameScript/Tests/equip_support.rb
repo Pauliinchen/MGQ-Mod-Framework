@@ -2,6 +2,7 @@
 #  equip_support.rb
 #
 #  Changelog:
+#      Paulinchen  2026-11-11: Read the Mod Collection's Equipment Window from Bundled once a test first loads it
 #      Paulinchen  2026-11-10: Gave the bag the items the gems are read from
 #      Paulinchen  2026-11-09: Gave the characters no states, which the Equipment Window reads for its stats
 #      Paulinchen  2026-11-07: Gave the party its fighting members, every member
@@ -408,7 +409,7 @@ class FakeMenuParty < FakeParty
   end
 end
 
-# Makes the party the Equipment Window sample shows: Luka with a socketed sword whose first socket
+# Makes the party the Equipment Window shows: Luka with a socketed sword whose first socket
 # holds a ruby, and Alice with nothing worn; Luka is the menu's character.
 #
 # @return [FakeHero] Luka.
@@ -424,4 +425,12 @@ def equip_party
   hero = FakeHero.new(1, "Luka", [sword, nil, nil])
   $game_party = FakeMenuParty.new([hero, FakeHero.new(2, "Alice", [nil, nil, nil])])
   hero
+end
+
+# Reads the Mod Collection's Equipment Window, which a build puts into the gitignored Bundled
+# folder, once a test first loads it, so the tests that never load it run without it.
+#
+# @return [String] The window's script.
+def equipment_window_source
+  @equipment_window_source ||= File.read(File.expand_path("../../Bundled/Equipment_Window.rb", __dir__), :encoding => "UTF-8")
 end

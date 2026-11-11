@@ -30,7 +30,7 @@ Patch/Mod_Framework/Graphics/  *.png
 
 - **The framework ships no program.** The game starts again by starting its own `Game.exe`, and the stub moves the waiting updates into place as it starts (see [The boot and the copies](#the-boot-and-the-copies)). A game that cannot start gets the framework from the website again by hand.
 - **No other mod's zip carries the framework.** Players install it on their own, from the website or the release zip; the stub still looks for copies inside mod folders.
-- **The zip brings the Equipment Window's first copy.** `Patch/Equipment_Window.rb`, copied from `Samples/`, is the website's mod `equipment-window`, which owns its updates. `Manifest.txt` leaves it out, and the framework's package (slug `mod-framework`) owns only `!Mod_Framework.rb` and `Mod_Framework/` (`ModMerge.FilesOf`), so the framework's update never touches the file and the browser updates and removes it like any mod. **Trap:** each release's copy must be a version the website lists, or the browser shows it as a changed copy: it asks whether to lose that copy before an update and cannot remove it.
+- **The zip brings the Equipment Window's first copy.** `Patch/Equipment_Window.rb`, the Mod Collection's latest released copy put in `Bundled/`, is the website's mod `equipment-window`, which owns its updates. `Manifest.txt` leaves it out, and the framework's package (slug `mod-framework`) owns only `!Mod_Framework.rb` and `Mod_Framework/` (`ModMerge.FilesOf`), so the framework's update never touches the file and the browser updates and removes it like any mod. **Trap:** each release's copy must be a version the website lists, or the browser shows it as a changed copy: it asks whether to lose that copy before an update and cannot remove it.
 
 The Android package builds the same C# for JoiPlay (NativeAOT linux-bionic-arm64, `ModFramework.so`) in a copy of the sources outside the repository, zips it with the scripts and the libssl stand-in as `MGQ-Mod-Framework-<version>-android.zip` and checks the zip:
 
@@ -60,10 +60,10 @@ bash Android/build.sh check <zip>      # check a zip built before
 
 ### Releasing
 
-1. Push your changes.
+1. Push your changes. When the Equipment Window changed, the Mod Collection releases first and its `Equipment_Window.rb` is imported on the website as a new version of `equipment-window`, its requirement of the framework set to this release's version.
 2. On GitHub, draft a release with a tag like `v0.1.0` and publish it. Players read the notes as they update, so write them for players, not as a commit log.
-3. The *Release* workflow (`.github/workflows/release.yml`) runs the script tests, publishes at that version, runs the C# tests against the published DLL and attaches `MGQ-Mod-Framework-0.1.0.zip`; then `Android/build.sh` on Linux attaches the Android zip. Keep the zip names: the website takes a zip whose name says android as the package for Android. If the run failed, fix the cause, then run it by hand from **Actions → Release** with the release's tag.
-4. Import the release on the website as a new version of the mod `mod-framework`, which the framework updates itself from. When `Samples/Equipment_Window.rb` changed since the last release, import that file as a new version of `equipment-window` too, so the copy the zip brings is one the website knows.
+3. The *Release* workflow (`.github/workflows/release.yml`) takes the Equipment Window from the Mod Collection's latest release into `Bundled/`, fails while no `equipment-window` version on the website holds it, runs the script tests, publishes at that version, runs the C# tests against the published DLL and attaches `MGQ-Mod-Framework-0.1.0.zip`; then `Android/build.sh` on Linux attaches the Android zip. Keep the zip names: the website takes a zip whose name says android as the package for Android. If the run failed, fix the cause, then run it by hand from **Actions → Release** with the release's tag.
+4. Import the release on the website as a new version of the mod `mod-framework`, which the framework updates itself from.
 
 Before a release, check the hooks against the newest translation. Within 0.x the Ruby API and the bridge topics only grow; the first change that breaks a mod is 1.0.0.
 
@@ -86,7 +86,7 @@ Before a release, check the hooks against the newest translation. Within 0.x the
 | `ModFramework/` | NativeAOT project -> `ModFramework.dll` (win-x86): the bridge host (`Bridge/`), the topics (`Topics/`), the game window's hook (`Windows/`), input (`Input/`), the tree, the places, the text measuring, the notices, the markers, the wheels and the theme (`Ui/`), the options' groups and key names (`Options/`), mod management (`Mods/`), the log, ini files and threads (`Runtime/`) |
 | `ModFramework.Tests/` | xUnit tests of the DLL, 32-bit like the game |
 | `Android/` | `build.sh`, the package for JoiPlay, and the libssl stand-in it links |
-| `Samples/` | `Equipment_Window.rb`, the Equipment Window, shipped as a mod of its own in the release zips |
+| `Bundled/` | gitignored; put the Mod Collection's `Equipment_Window/Equipment_Window.rb`, or its latest release's, here to build or test: a publish without it fails and names the file, and the release zips bring it as a mod of its own |
 | `docs/` | This file, the player guide and the modders' pages of the UI layer (`ui/`, with its pictures in `ui/images/`) |
 
 ### How the parts connect

@@ -2,6 +2,7 @@
 #  layer_game_windows_test.rb
 #
 #  Changelog:
+#      Paulinchen  2026-11-11: Loaded the Mod Collection's Equipment Window from Bundled
 #      Paulinchen  2026-11-09: Found the Equipment Window's parts by its ew_ ids
 #                            - Checked the Equipment Window's hotkey help by the part in focus
 #                            - Checked the shoulders the Equipment Window's hotkey help names on a gamepad
@@ -33,9 +34,6 @@
 require_relative "game_lists_support"
 require_relative "layer_support"
 require_relative "equip_support"
-
-# The Equipment Window mod.
-EQUIPMENT_WINDOW = File.read(File.expand_path("../../Samples/Equipment_Window.rb", __dir__), :encoding => "UTF-8")
 
 # A mod like Gear Compare: a Compare button on the Equipment Window by its ids, a Compare command
 # after Equip and Formation renamed in the game's menu, and the gold window dimmer, by their classes.
@@ -429,7 +427,7 @@ in_game_folder do
     [:Scene_Map, :Scene_Equip].each { |name| Object.const_set(name, Class.new(Scene_Base)) unless Object.const_defined?(name) }
     [:call, :goto].each { |name| SceneManager.define_singleton_method(name) { |klass| $scene_now = klass.new } }
     luka = equip_party
-    load_mod("Patch/Equipment_Window.rb", EQUIPMENT_WINDOW)
+    load_mod("Patch/Equipment_Window.rb", equipment_window_source)
     load_mod("Patch/Gear_Compare.rb", GEAR_COMPARE)
     frame
     handle = ui.open(Equipment_Window::EquipWindow, actor: luka)

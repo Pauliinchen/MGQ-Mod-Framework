@@ -85,7 +85,7 @@ module Purse_Check
 end
 ```
 
-Every part and call has a page with examples, pictures and every param; the [UI components](docs/ui/README.md) index tells what each is for. Start with [Component](docs/ui/component.md) (params, state and events) and [Mod](docs/ui/mod.md) (your files, tags, title mods, the restart, installs and updates). The [Equipment Window](Samples/Equipment_Window.rb) is a whole mod built on it. Set your mod's tag and what it needs on its page of the website, and tell your players there that it needs the Mod Framework.
+Every part and call has a page with examples, pictures and every param; the [UI components](docs/ui/README.md) index tells what each is for. Start with [Component](docs/ui/component.md) (params, state and events) and [Mod](docs/ui/mod.md) (your files, tags, title mods, the restart, installs and updates). The [Equipment Window](https://github.com/Pauliinchen/MGQ-Paradox-Mod-Collection/blob/main/Equipment_Window/Equipment_Window.rb) of the Mod Collection is a whole mod built on it. Set your mod's tag and what it needs on its page of the website, and tell your players there that it needs the Mod Framework.
 
 ### Components
 

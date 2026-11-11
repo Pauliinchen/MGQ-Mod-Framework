@@ -2,12 +2,13 @@
 #  equipment_window_test.rb
 #
 #  Changelog:
+#      Paulinchen  2026-11-11: Loaded the Mod Collection's Equipment Window from Bundled
 #      Paulinchen  2026-11-09: Covered the item list showing more rows in a taller window
 #                            - Created
 #
 #----------------------------------------------------------------
 
-# Covers the Equipment Window sample in a booted game against FakeTree, as a player uses it: the
+# Covers the Mod Collection's Equipment Window in a booted game against FakeTree, as a player uses it: the
 # character's stats judged against what showed before new gear; the item's head with its element
 # in a chip after its name and its sockets, whose tooltips end in the note and whose pick opens the
 # gem dialog or buzzes in a fixed slot; the item dialog's comparison of the worn sword with another,
@@ -20,13 +21,10 @@ require_relative "game_lists_support"
 require_relative "layer_support"
 require_relative "equip_support"
 
-# The Equipment Window sample.
-EQUIPMENT_WINDOW = File.read(File.expand_path("../../Samples/Equipment_Window.rb", __dir__), :encoding => "UTF-8")
-
 # Loads the Equipment Window anew into a game booted anew, whose component class is a new one.
 def load_window
   Object.send(:remove_const, :Equipment_Window) if Object.const_defined?(:Equipment_Window)
-  load_mod("Patch/Equipment_Window.rb", EQUIPMENT_WINDOW)
+  load_mod("Patch/Equipment_Window.rb", equipment_window_source)
 end
 
 # An item that multiplies each of the character's parameters by a factor besides adding to it.

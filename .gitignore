@@ -7,5 +7,8 @@ obj/
 # publish output, the release layout ready to copy into a game folder
 Shipping/
 
+# the Mod Collection's Equipment Window the zips bring, put here before a build (docs/DEVELOPER.md)
+Bundled/
+
 # runtime files, in case the game is ever pointed at this folder while testing
 *.log

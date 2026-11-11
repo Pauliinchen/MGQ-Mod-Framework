@@ -3,6 +3,7 @@
 #  build.sh
 #
 #  Changelog:
+#      Paulinchen  2026-11-11: Took the Equipment Window from Bundled, the Mod Collection's released copy
 #      Paulinchen  2026-11-08: Brought the Equipment Window into the package and left it out of Manifest.txt
 #      Paulinchen  2026-11-07: Dropped the helper and Update.bat from the package checks
 #                            - Copied the framework's one project, which holds the bridge and the runtime
@@ -100,7 +101,7 @@ VERSION=${1:-$(sed -n 's:.*<Version>\(.*\)</Version>.*:\1:p' "$REPO/ModFramework
 echo "android build: $VERSION in $WORK"
 rm -rf "$WORK"
 mkdir -p "$WORK"
-tar -C "$REPO" --exclude=bin --exclude=obj -cf - Directory.Build.targets GameScript ModFramework Android Samples/Equipment_Window.rb | tar -C "$WORK" -xf -
+tar -C "$REPO" --exclude=bin --exclude=obj -cf - Directory.Build.targets GameScript ModFramework Android Bundled/Equipment_Window.rb | tar -C "$WORK" -xf -
 
 # The stand-in names the engine as needed, so its lookups reach the engine's OpenSSL. Only the name
 # counts, so it links against an empty library of that name instead of JoiPlay's own.
@@ -120,7 +121,7 @@ PUBLISHED="$WORK/ModFramework/bin/Release/net10.0/$RID/publish"
 PACKAGE="$WORK/Shipping-android"
 FOLDER="$PACKAGE/Patch/Mod_Framework"
 mkdir -p "$FOLDER/Scripts" "$FOLDER/Graphics"
-cp "$WORK/GameScript/!Mod_Framework.rb" "$WORK/Samples/Equipment_Window.rb" "$PACKAGE/Patch/"
+cp "$WORK/GameScript/!Mod_Framework.rb" "$WORK/Bundled/Equipment_Window.rb" "$PACKAGE/Patch/"
 find "$WORK/GameScript/Mod_Framework" -maxdepth 1 -type f -exec cp {} "$FOLDER/" \;
 cp "$WORK/GameScript/Mod_Framework/Scripts/"*.rbx "$FOLDER/Scripts/"
 cp "$WORK/GameScript/Mod_Framework/Graphics/"*.png "$FOLDER/Graphics/"
