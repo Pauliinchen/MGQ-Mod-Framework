@@ -2,6 +2,7 @@
 //  EditModelTests.cs
 //
 //  Changelog:
+//      Paulinchen  2026-11-11: Handed the text box an input model
 //      Paulinchen  2026-11-07: Replaced the replay of the scripts' editor with one flow of typing, moving and erasing
 //                            - Used the bridge and the runtime under the framework's namespace
 //      Paulinchen  2026-11-05: Checked a box that types a whole number, a paste into it and the number it tells
@@ -19,6 +20,7 @@ using System.Collections.Generic;
 using System.Linq;
 using MGQParadox.ModFramework.Bridge;
 using MGQParadox.ModFramework.Bridge.Ruby;
+using MGQParadox.ModFramework.Input;
 using MGQParadox.ModFramework.Ui;
 using MGQParadox.ModFramework.Ui.Text;
 
@@ -54,7 +56,7 @@ public sealed class EditModelTests
     public EditModelTests()
     {
         var host = new UiHost(_ui.Context);
-        host.Add(new EditModel(host, new UiText(host), _keyboard));
+        host.Add(new EditModel(host, new UiText(host), _keyboard, new InputModel(host, new FakeInput())));
         var widths = new RubyHash();
         for (int point = 32; point < 127; point++)
         {

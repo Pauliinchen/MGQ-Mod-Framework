@@ -3,6 +3,7 @@
 //
 //  Changelog:
 //      Paulinchen  2026-11-11: Tapped a key whose key message comes while the key poll misses it
+//                            - Handed the text box the input model and ran it in a frame's tick with what it posted
 //      Paulinchen  2026-11-07: Used the bridge and the runtime under the framework's namespace
 //      Paulinchen  2026-11-04: Added the text box on a keyboard, the layout's offers, held and repeated buttons, a key held
 //                              for a frame, several properties set at once, measured sizes, the focus of a report, a font
@@ -50,7 +51,7 @@ internal sealed class TreeHarness
         EditModel? edit = null;
         if (keyboard is not null)
         {
-            edit = new EditModel(host, text, keyboard);
+            edit = new EditModel(host, text, keyboard, input);
             host.Add(edit);
         }
 
@@ -61,6 +62,11 @@ internal sealed class TreeHarness
     /// Gets the bridge the models post on.
     /// </summary>
     public UiContext Ui { get; } = new();
+
+    /// <summary>
+    /// Gets the text box's event of the last frame that ran it, null when it posted none.
+    /// </summary>
+    public RubyHash? Edited { get; private set; }
 
     /// <summary>
     /// Gets what the input model reads.
@@ -317,14 +323,16 @@ internal sealed class TreeHarness
     public RubyHash Repeat(UiButton button) => Frame(buttons: Repeated(button));
 
     /// <summary>
-    /// Runs a frame's tick as the scripts do, the input model and the layout before the tree.
+    /// Runs a frame's tick as the scripts do, the input model and the layout before the text box
+    /// and the tree.
     /// </summary>
     /// <param name="tree">The tree's input, null for none.</param>
     /// <param name="buttons">The game's buttons.</param>
     /// <param name="extra">The game's extra buttons.</param>
     /// <param name="offers">The boxes offered to the layout, each [id, x, y, width, height, depth], null for none.</param>
+    /// <param name="edit">The text box's input, see EditModel.Tick, null for none.</param>
     /// <returns>The tree's event, empty when it posted none.</returns>
-    public RubyHash Frame(RubyHash? tree = null, int buttons = 0, int extra = 0, RubyArray? offers = null)
+    public RubyHash Frame(RubyHash? tree = null, int buttons = 0, int extra = 0, RubyArray? offers = null, RubyArray? edit = null)
     {
         var inputs = new RubyHash
         {
@@ -332,16 +340,27 @@ internal sealed class TreeHarness
             { UiHost.ExtraButtonsKey, extra },
             { InputModel.ModelName, new RubyHash() },
             { LayoutModel.ModelName, offers ?? new RubyArray() },
-            { ComponentTree.ModelName, tree ?? new RubyHash() },
         };
+        if (edit is not null)
+        {
+            inputs.Add("edit", edit);
+        }
+
+        inputs.Add(ComponentTree.ModelName, tree ?? new RubyHash());
+        Edited = null;
+        RubyHash report = new();
         foreach ((string topic, RubyValue payload) in Ui.Tick(inputs))
         {
             if (topic == ComponentTree.EventTopic)
             {
-                return payload.AsHash();
+                report = payload.AsHash();
+            }
+            else if (topic == EditModel.EventTopic)
+            {
+                Edited = payload.AsHash();
             }
         }
 
-        return new RubyHash();
+        return report;
     }
 }

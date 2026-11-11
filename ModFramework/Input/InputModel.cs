@@ -2,7 +2,8 @@
 //  InputModel.cs
 //
 //  Changelog:
-//      Paulinchen  2026-11-11: Told a button the keyboard's while one of its keys is held or sent a key message since the tick before
+//      Paulinchen  2026-11-11: Counted the numpad's digits as the keyboard's keys of the four directions and told whether one types now
+//                            - Told a button the keyboard's while one of its keys is held or sent a key message since the tick before
 //                            - Counted a key as gone down once its key message came, also where the poll missed it
 //      Paulinchen  2026-11-07: Used the bridge and the runtime under the framework's namespace
 //      Paulinchen  2026-11-05: Posted no event for a tick the same as the last one posted, so an idle frame makes the scripts no objects
@@ -114,12 +115,12 @@ internal sealed class InputModel : IUiModel
 
     /// <summary>
     /// Each of the game's buttons with the keyboard's keys it has besides those F1 binds: the arrow
-    /// keys of the four directions.
+    /// key and the numpad's digit of each of the four directions.
     /// </summary>
     private static readonly (UiButton Button, string? Bound, int[] Keys)[] ButtonKeys =
     [
-        (UiButton.Confirm, "C", []), (UiButton.Cancel, "B", []), (UiButton.Up, null, [0x26]), (UiButton.Down, null, [0x28]),
-        (UiButton.Left, null, [0x25]), (UiButton.Right, null, [0x27]), (UiButton.L, "L", []), (UiButton.R, "R", []),
+        (UiButton.Confirm, "C", []), (UiButton.Cancel, "B", []), (UiButton.Up, null, [0x26, 0x68]), (UiButton.Down, null, [0x28, 0x62]),
+        (UiButton.Left, null, [0x25, 0x64]), (UiButton.Right, null, [0x27, 0x66]), (UiButton.L, "L", []), (UiButton.R, "R", []),
     ];
 
     /// <summary>
@@ -136,6 +137,16 @@ internal sealed class InputModel : IUiModel
     /// Windows' code of the physical right mouse button.
     /// </summary>
     private const int PhysicalRight = 0x02;
+
+    /// <summary>
+    /// Windows' code of the numpad's 0; the numpad's digits follow it up to its 9.
+    /// </summary>
+    private const int NumpadZero = 0x60;
+
+    /// <summary>
+    /// Windows' code of the numpad's 9.
+    /// </summary>
+    private const int NumpadNine = 0x69;
 
     /// <summary>
     /// The lowest key code a script may watch.
@@ -358,8 +369,8 @@ internal sealed class InputModel : IUiModel
 
     /// <summary>
     /// Tells whether one of the game's buttons comes from the keyboard at the last tick: one of its
-    /// keys, those F1 binds to it or a direction's arrow key, is held now or sent a key message
-    /// since the tick before.
+    /// keys, those F1 binds to it or a direction's arrow key and numpad digit, is held now or sent a
+    /// key message since the tick before.
     /// </summary>
     /// <param name="button">The button.</param>
     /// <returns>Whether it does.</returns>
@@ -370,6 +381,34 @@ internal sealed class InputModel : IUiModel
             if (each == button)
             {
                 return AnyFromKeyboard(own) || (bound is not null && AnyFromKeyboard(Assignment.KeysOf(bound)));
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Tells whether the numpad's digit of a direction is held now or sent a key message since the
+    /// tick before the last, so with Num Lock on it types its digit while the game reads it as the
+    /// direction too.
+    /// </summary>
+    /// <param name="direction">The direction: UP, DOWN, LEFT or RIGHT.</param>
+    /// <returns>Whether it is; false for any other button.</returns>
+    public bool NumpadTyped(UiButton direction)
+    {
+        foreach ((UiButton each, _, int[] own) in ButtonKeys)
+        {
+            if (each != direction)
+            {
+                continue;
+            }
+
+            foreach (int code in own)
+            {
+                if (code is >= NumpadZero and <= NumpadNine && KeyFromKeyboard(code))
+                {
+                    return true;
+                }
             }
         }
 
@@ -537,7 +576,7 @@ internal sealed class InputModel : IUiModel
     {
         for (int place = 0; place < codes.Count; place++)
         {
-            if (_source.KeyDown(codes[place]) || KeyPresses.Holds(_pressed, codes[place]))
+            if (KeyFromKeyboard(codes[place]))
             {
                 return true;
             }
@@ -545,6 +584,13 @@ internal sealed class InputModel : IUiModel
 
         return false;
     }
+
+    /// <summary>
+    /// Tells whether a key is held now or sent a key message since the tick before the last.
+    /// </summary>
+    /// <param name="code">Windows' code of the key.</param>
+    /// <returns>Whether it did.</returns>
+    private bool KeyFromKeyboard(int code) => _source.KeyDown(code) || KeyPresses.Holds(_pressed, code);
 
     /// <summary>
     /// Reads the key settings of F1 and logs them once they differ from the last read, or why the

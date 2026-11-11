@@ -2,6 +2,7 @@
 //  FrameworkBridge.cs
 //
 //  Changelog:
+//      Paulinchen  2026-11-11: Handed the text box being typed into the input model
 //      Paulinchen  2026-11-09: Noted an error while installing the bridge before building its log line
 //                            - Registered the topic that lets the game's program use up to 4 GB
 //                            - Registered the topics of the game's memory
@@ -113,7 +114,7 @@ internal static class FrameworkBridge
         var layout = new LayoutModel(host, input);
         var text = new UiText(host);
         host.Add(layout);
-        var edit = new EditModel(host, text, scripted ?? (ITypedText)new TypedText());
+        var edit = new EditModel(host, text, scripted ?? (ITypedText)new TypedText(), input);
         host.Add(edit);
         host.Add(new ComponentTree(host, input, layout, text, edit));
         WheelModel.RegisterTopics(host, input);

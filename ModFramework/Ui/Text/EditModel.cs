@@ -2,6 +2,7 @@
 //  EditModel.cs
 //
 //  Changelog:
+//      Paulinchen  2026-11-11: Moved the caret by no direction whose numpad digit typed in the same tick
 //      Paulinchen  2026-11-07: Used the bridge and the runtime under the framework's namespace
 //      Paulinchen  2026-11-05: Opened a box that types a whole number by its rule, typed what came in one tick into it as one,
 //                              and told the number it gives
@@ -22,6 +23,7 @@ using System.Text;
 using System.Text.RegularExpressions;
 using MGQParadox.ModFramework.Bridge;
 using MGQParadox.ModFramework.Bridge.Ruby;
+using MGQParadox.ModFramework.Input;
 
 namespace MGQParadox.ModFramework.Ui.Text;
 
@@ -35,7 +37,7 @@ namespace MGQParadox.ModFramework.Ui.Text;
 /// them; closing the box drops it, as the scripts dropped what came after Enter. The keyboard takes
 /// what is typed only while a box is open, so no key typed elsewhere waits for the next box.
 /// </remarks>
-public sealed class EditModel : IUiModel
+internal sealed class EditModel : IUiModel
 {
     /// <summary>
     /// Opens a box: {"text", "max_chars", "allowed" ([source, ignore case] of a Ruby pattern of one
@@ -81,6 +83,12 @@ public sealed class EditModel : IUiModel
     private const int EscapePoint = 0x1B;
 
     /// <summary>
+    /// The game's four directions with the key of each that moves the caret.
+    /// </summary>
+    private static readonly (UiButton Direction, EditKeys Key)[] Directions =
+        [(UiButton.Left, EditKeys.Left), (UiButton.Right, EditKeys.Right), (UiButton.Up, EditKeys.Up), (UiButton.Down, EditKeys.Down)];
+
+    /// <summary>
     /// The host the box posts on.
     /// </summary>
     private readonly UiHost _host;
@@ -94,6 +102,11 @@ public sealed class EditModel : IUiModel
     /// The keyboard.
     /// </summary>
     private readonly ITypedText _keyboard;
+
+    /// <summary>
+    /// The input model, which tells the numpad's digits that typed.
+    /// </summary>
+    private readonly InputModel _input;
 
     /// <summary>
     /// Characters typed and not typed into the box yet, since typing stopped at Enter or Escape.
@@ -127,12 +140,14 @@ public sealed class EditModel : IUiModel
     /// <param name="host">The host of the interface's models.</param>
     /// <param name="text">The fonts.</param>
     /// <param name="keyboard">What the player types.</param>
-    public EditModel(UiHost host, UiText text, ITypedText keyboard)
+    /// <param name="input">The input model of the same host.</param>
+    public EditModel(UiHost host, UiText text, ITypedText keyboard, InputModel input)
     {
         ArgumentNullException.ThrowIfNull(host);
         _host = host;
         _text = text;
         _keyboard = keyboard;
+        _input = input;
         BridgeContext context = host.Context;
         context.Register(OpenTopic, (_, request) => Open(request.AsHash()));
         context.Register(CloseTopic, (_, request) =>
@@ -218,7 +233,7 @@ public sealed class EditModel : IUiModel
 
         if (keys >= 0)
         {
-            EditKeys follow = box.Locked ? (EditKeys)keys & ~EditKeys.Delete : (EditKeys)keys;
+            EditKeys follow = WithoutNumpad(box.Locked ? (EditKeys)keys & ~EditKeys.Delete : (EditKeys)keys);
             box.Editor.Follow(follow, box.Rows > 0 ? Spans(box) : null);
         }
 
@@ -471,6 +486,25 @@ public sealed class EditModel : IUiModel
         }
 
         return points.AsSpan(from);
+    }
+
+    /// <summary>
+    /// Leaves out of the keys the directions whose numpad digit typed this tick, which the game reads
+    /// as the direction too.
+    /// </summary>
+    /// <param name="keys">The keys the scripts read.</param>
+    /// <returns>The keys that move the caret.</returns>
+    private EditKeys WithoutNumpad(EditKeys keys)
+    {
+        foreach ((UiButton direction, EditKeys key) in Directions)
+        {
+            if (_input.NumpadTyped(direction))
+            {
+                keys &= ~key;
+            }
+        }
+
+        return keys;
     }
 
     /// <summary>

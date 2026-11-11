@@ -2,7 +2,8 @@
 //  ComponentTreeKeys.cs
 //
 //  Changelog:
-//      Paulinchen  2026-11-11: Asked the input model whether cancel, confirm, the shoulders and the jump button came from a gamepad
+//      Paulinchen  2026-11-11: Kept a numpad digit typed into a text field from stepping, scrolling or leaving it as a direction
+//                            - Asked the input model whether cancel, confirm, the shoulders and the jump button came from a gamepad
 //      Paulinchen  2026-11-09: Let cancel on the part a window opened on close it instead of walking a way back or sliding back
 //                            - Let the keys that step tabs pass over tabs that show a single tab
 //      Paulinchen  2026-11-07: Moved an item carried between drop zones by the arrows and put it back by cancel
@@ -1095,13 +1096,23 @@ internal sealed partial class ComponentTree
 
     /// <summary>
     /// Tells which way LEFT or RIGHT leaves a text field of one line: LEFT that went down with its
-    /// caret at the start of its text, RIGHT at its end.
+    /// caret at the start of its text, RIGHT at its end, each unless the numpad's digit of it typed.
     /// </summary>
     /// <param name="field">The text field.</param>
     /// <param name="buttons">The game's buttons of the tick.</param>
     /// <returns>-1 for LEFT, 1 for RIGHT, 0 for neither.</returns>
-    private static int CaretSide(Node field, UiButtons buttons) =>
-        buttons.Triggered(UiButton.Left) && field.CaretEnds.Start ? -1 : buttons.Triggered(UiButton.Right) && field.CaretEnds.End ? 1 : 0;
+    private int CaretSide(Node field, UiButtons buttons) =>
+        CaretLeaves(field.CaretEnds.Start, buttons, UiButton.Left) ? -1 : CaretLeaves(field.CaretEnds.End, buttons, UiButton.Right) ? 1 : 0;
+
+    /// <summary>
+    /// Tells whether LEFT or RIGHT leaves a text field at the end of its caret's way.
+    /// </summary>
+    /// <param name="atEnd">Whether the caret stands at the side the direction goes to.</param>
+    /// <param name="buttons">The game's buttons of the tick.</param>
+    /// <param name="direction">LEFT or RIGHT.</param>
+    /// <returns>Whether it went down and is no numpad digit typed.</returns>
+    private bool CaretLeaves(bool atEnd, UiButtons buttons, UiButton direction) =>
+        atEnd && buttons.Triggered(direction) && !_input.NumpadTyped(direction);
 
     /// <summary>
     /// Finds the text field that steers a list, where UP on its first line goes, while it can take the focus.
@@ -1141,14 +1152,14 @@ internal sealed partial class ComponentTree
         list.Cursor < 0 || Scroll.StopFrom(list, list.Cursor + step, step) is not int next || next / list.RowCells != list.Cursor / list.RowCells;
 
     /// <summary>
-    /// Tells which way a gamepad's UP or DOWN goes: the game's buttons while no arrow key is held,
-    /// since a field reads the arrow keys itself.
+    /// Tells which way a gamepad's UP or DOWN goes: the game's buttons while neither comes from the
+    /// keyboard, since a field reads the arrow keys itself and a numpad digit types.
     /// </summary>
     /// <param name="buttons">The game's buttons of the tick.</param>
     /// <returns>-1 for UP, 1 for DOWN, 0 for neither.</returns>
     private int PadVertical(UiButtons buttons)
     {
-        if (_input.KeyDown(UpKey) || _input.KeyDown(DownKey))
+        if (_input.FromKeyboard(UiButton.Up) || _input.FromKeyboard(UiButton.Down))
         {
             return 0;
         }

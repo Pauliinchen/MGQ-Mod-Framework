@@ -2,7 +2,8 @@
 //  TreeKeysTests.cs
 //
 //  Changelog:
-//      Paulinchen  2026-11-11: Checked that a typing text field takes a key tap the poll missed as the keyboard's
+//      Paulinchen  2026-11-11: Checked that the numpad's digits type into a text field without moving the caret, a number or the focus
+//                            - Checked that a typing text field takes a key tap the poll missed as the keyboard's
 //      Paulinchen  2026-11-09: Checked that a gamepad's shoulder passes tabs that show a single tab on to the window's page
 //      Paulinchen  2026-11-07: Used the bridge and the runtime under the framework's namespace
 //      Paulinchen  2026-11-06: Checked that the tabs the arrows step pass over a reading pane only the jump key reaches
@@ -16,6 +17,7 @@
 using System.Collections.Generic;
 using MGQParadox.ModFramework.Bridge.Ruby;
 using MGQParadox.ModFramework.Ui;
+using MGQParadox.ModFramework.Ui.Text;
 using MGQParadox.ModFramework.Ui.Tree;
 using static MGQParadox.ModFramework.Tests.TreeHarness;
 
@@ -25,7 +27,7 @@ namespace MGQParadox.ModFramework.Tests;
 /// Covers the keys of the component tree beyond the arrows: tabs stepped by Tab, the shoulders and
 /// the arrows, the shoulders and page keys reaching the root's page, tabs that are one key stop, the
 /// keys a text field claims and those the tree takes from the hotkeys, a key tap a typing field
-/// tells from a gamepad, the hotkeys parts declare, and the game's extra buttons.
+/// tells from a gamepad, the numpad's digits a field types, the hotkeys parts declare, and the game's extra buttons.
 /// </summary>
 public sealed class TreeKeysTests
 {
@@ -40,6 +42,18 @@ public sealed class TreeKeysTests
 
     /// <summary>Windows' code of the left Alt.</summary>
     private const int LeftAlt = 0xA4;
+
+    /// <summary>Windows' code of the numpad's 4, the game's LEFT.</summary>
+    private const int NumpadFour = 0x64;
+
+    /// <summary>Windows' code of the numpad's 5, no direction.</summary>
+    private const int NumpadFive = 0x65;
+
+    /// <summary>Windows' code of the numpad's 6, the game's RIGHT.</summary>
+    private const int NumpadSix = 0x66;
+
+    /// <summary>Windows' code of the numpad's 8, the game's UP.</summary>
+    private const int NumpadEight = 0x68;
 
     /// <summary>
     /// The tree run tick by tick.
@@ -268,6 +282,66 @@ public sealed class TreeKeysTests
         Assert.Equal(["3 rest"], Events(chat.Tap(ComponentTree.EscapeKey, Triggered(UiButton.Cancel))));
         chat.Frame(Set(3, "typing", true));
         Assert.Equal(["3 rest"], Events(chat.Press(UiButton.Cancel)));
+    }
+
+    /// <summary>
+    /// Asserts that the numpad's digits type into a text field while the game reads 2, 4, 6 and 8 as
+    /// its directions too: 4, 5 and 6 type "456" with the caret at the end and the focus kept, the
+    /// numpad's 8 steps no number field and reaches no field that claims the arrow keys, while the Up
+    /// arrow still steps the number, a gamepad's UP still reaches that field and a gamepad's LEFT
+    /// still moves the caret.
+    /// </summary>
+    [Fact]
+    public void TypingField_TypesNumpadDigitsWithoutMovingByThem()
+    {
+        var keyboard = new FakeTyping();
+        var line = new TreeHarness(keyboard);
+        line.Frame(Adds(
+            Node(1, null, "window", ("size", Pair(400, 100))),
+            Node(2, 1, "stack", ("layout", "row")),
+            Node(3, 2, "button", Measured(60, 24)),
+            Node(4, 2, "text_field", Measured(100, 24), ("leave_sides", true), ("caret_ends", new RubyArray { true, true })),
+            Node(5, 2, "button", Measured(60, 24))));
+        line.Frame(new RubyHash { { "focus", 4 } });
+        int box = line.Ui.Value(EditModel.OpenTopic, new RubyHash { { "text", "" } }).AsInt();
+        RubyHash edited = [];
+        RubyHash Typed(int key, string digit, UiButton? direction)
+        {
+            keyboard.Typed.Enqueue((digit, 1));
+            line.Input.Down.Add(key);
+            int bits = direction is UiButton moved ? Triggered(moved) | Repeated(moved) : 0;
+            int caretKeys = direction is UiButton.Left ? (int)EditKeys.Left : direction is UiButton.Right ? (int)EditKeys.Right : 0;
+            RubyHash report = line.Frame(buttons: bits, edit: [box, caretKeys, 1, 0, 0]);
+            line.Input.Down.Remove(key);
+            edited = line.Edited!;
+            int cursor = edited["cursor"].AsInt();
+            line.Frame(Set(4, "caret_ends", new RubyArray { cursor == 0, cursor == edited["text"].AsText().Length }));
+            return report;
+        }
+
+        Assert.Null(Focus(Typed(NumpadFour, "4", UiButton.Left)));
+        Assert.Null(Focus(Typed(NumpadFive, "5", null)));
+        Assert.Null(Focus(Typed(NumpadSix, "6", UiButton.Right)));
+        Assert.Equal("456", edited["text"].AsText());
+        Assert.Equal(3, edited["cursor"].AsInt());
+        line.Frame(buttons: Triggered(UiButton.Left) | Repeated(UiButton.Left), edit: [box, (int)EditKeys.Left, 0, 0, 0]);
+        Assert.Equal(2, line.Edited!["cursor"].AsInt());
+
+        var fields = new TreeHarness(new FakeTyping());
+        fields.Frame(Adds(
+            Node(1, null, "window", ("layer", true), ("at", Pair(0, 0)), ("size", Pair(200, 100))),
+            Node(2, 1, "numeric_field", ("number", 4), ("number_min", 2), ("number_max", 40), ("confirm_to_type", true), ("typing", true),
+                 ("takes", "0"), ("rows", 1), ("at", Pair(0, 0)), ("size", Pair(100, 24))),
+            Node(3, 1, "text_field", ("keys", new RubyArray { ComponentTree.UpKey, ComponentTree.DownKey }), ("at", Pair(0, 40)), ("size", Pair(100, 24)))));
+        fields.Frame(new RubyHash { { "focus", 2 } });
+        fields.Ui.Value(EditModel.OpenTopic, new RubyHash { { "text", "4" }, { "number", new RubyArray { 2, 40 } } });
+        RubyHash numpadUp = fields.Key(NumpadEight, Repeated(UiButton.Up));
+        Assert.Empty(Events(numpadUp));
+        Assert.True(numpadUp["cues"].IsNil);
+        Assert.Equal([UiCue.Cursor], Cues(fields.Key(ComponentTree.UpKey, Repeated(UiButton.Up))));
+        fields.Frame(new RubyHash { { "focus", 3 } });
+        Assert.Empty(Events(fields.Key(NumpadEight, Repeated(UiButton.Up))));
+        Assert.Equal(["3 key 38"], Events(fields.Repeat(UiButton.Up)));
     }
 
     /// <summary>
