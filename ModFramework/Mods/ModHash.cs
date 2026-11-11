@@ -2,6 +2,7 @@
 //  ModHash.cs
 //
 //  Changelog:
+//      Paulinchen  2026-11-11: Hashed a file both ways once, so a kept pair of hashes is matched again without reading it
 //      Paulinchen  2026-11-07: Removed the hash of a file on disk, which nothing called
 //      Paulinchen  2026-10-30: Moved into the Mod Framework
 //      Paulinchen  2026-10-24: Matched a file against the hash of its raw bytes too
@@ -58,18 +59,37 @@ internal static class ModHash
     }
 
     /// <summary>
+    /// Hashes a mod's file both ways a hash may name it.
+    /// </summary>
+    /// <param name="name">The file's name or path, which tells a script from other files.</param>
+    /// <param name="bytes">The file.</param>
+    /// <returns>The SHA-256 of its raw bytes and <see cref="Of"/>.</returns>
+    public static FileHashes Hashes(string name, ReadOnlySpan<byte> bytes)
+    {
+        var raw = Convert.ToHexStringLower(SHA256.HashData(bytes));
+        return new FileHashes(raw, IsScript(name) ? Of(name, bytes) : raw);
+    }
+
+    /// <summary>
     /// Tells whether a mod's file is the one a hash names, as the website hashes it or without its carriage returns.
     /// </summary>
     /// <remarks>
     /// The website hashes every file as it is, so a script it lists with carriage returns matches only its raw hash.
     /// </remarks>
+    /// <param name="hashes">The file's hashes, see <see cref="Hashes"/>.</param>
+    /// <param name="hash">The hash, 64 hexadecimal characters.</param>
+    /// <returns>Whether either of them equals the hash.</returns>
+    public static bool Matches(FileHashes hashes, string hash) =>
+        string.Equals(hashes.Raw, hash, StringComparison.OrdinalIgnoreCase) || string.Equals(hashes.Script, hash, StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>
+    /// Tells whether a mod's file is the one a hash names, see <see cref="Matches(FileHashes, string)"/>.
+    /// </summary>
     /// <param name="name">The file's name or path, which tells a script from other files.</param>
     /// <param name="bytes">The file.</param>
     /// <param name="hash">The hash, 64 hexadecimal characters.</param>
-    /// <returns>Whether the SHA-256 of the raw bytes or <see cref="Of"/> equals the hash.</returns>
-    public static bool Matches(string name, ReadOnlySpan<byte> bytes, string hash) =>
-        string.Equals(Convert.ToHexStringLower(SHA256.HashData(bytes)), hash, StringComparison.OrdinalIgnoreCase)
-        || string.Equals(Of(name, bytes), hash, StringComparison.OrdinalIgnoreCase);
+    /// <returns>Whether it is.</returns>
+    public static bool Matches(string name, ReadOnlySpan<byte> bytes, string hash) => Matches(Hashes(name, bytes), hash);
 
     /// <summary>
     /// Tells a script from other files.
@@ -78,3 +98,10 @@ internal static class ModHash
     /// <returns>Whether it is a Ruby script.</returns>
     private static bool IsScript(string name) => name.EndsWith(".rb", StringComparison.OrdinalIgnoreCase);
 }
+
+/// <summary>
+/// The hashes of a mod's file, see <see cref="ModHash.Hashes"/>.
+/// </summary>
+/// <param name="Raw">The SHA-256 of its raw bytes.</param>
+/// <param name="Script">The SHA-256 a script has without its carriage returns; the raw one for other files.</param>
+internal readonly record struct FileHashes(string Raw, string Script);

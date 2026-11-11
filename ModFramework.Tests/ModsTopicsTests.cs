@@ -2,7 +2,8 @@
 //  ModsTopicsTests.cs
 //
 //  Changelog:
-//      Paulinchen  2026-11-11: Covered a collection turned on with the mods its mods need in turn, the needs an install brings and a mod
+//      Paulinchen  2026-11-11: Read how a mod stands before and after its install and removal
+//                            - Covered a collection turned on with the mods its mods need in turn, the needs an install brings and a mod
 //                              found by a name the picks hide
 //      Paulinchen  2026-11-09: Ran the work in a start that tells whether it started
 //      Paulinchen  2026-11-08: Covered a Data mod, which the player installs and updates by hand only
@@ -182,17 +183,21 @@ public sealed class ModsTopicsTests : IDisposable
     /// Asserts that an install of a mod of the cache's list writes it into Patch and tells how it
     /// ended once, that a download that fails names the mod and why, that a mod no list names is
     /// refused, and that removing the installed mod deletes its script while removing it again is
-    /// refused with why.
+    /// refused with why; the browser reads how the mod stands after each change, though it knew the
+    /// file's hashes before.
     /// </summary>
     [Fact]
     public void InstallThenRemove_WritesAndDeletesTheMod()
     {
+        var before = StatusOf("site:level-cap");
         File.Delete(Path.Combine(_game.Path, "Patch", "Level_Cap.rb"));
+        var deleted = StatusOf("site:level-cap");
         _ui.Drain();
         _downloads["site:level-cap"] = () => ModMergeTests.Script;
 
         var started = _ui.Value(ModsTopics.InstallTopic, new RubyHash { { "ids", new RubyArray { "site:level-cap" } } }).AsHash();
 
+        Assert.Equal((ModStatus.Current, ModStatus.Available, ModStatus.Current), (before, deleted, StatusOf("site:level-cap")));
         Assert.Equal(new RubyHash { { "started", true }, { "refused", RubyNil.Value } }, started);
         Assert.True(_game.Has("Patch/Level_Cap.rb"));
         Assert.Equal(
@@ -214,6 +219,7 @@ public sealed class ModsTopicsTests : IDisposable
 
         Assert.Equal((new RubyArray { "Level Cap" }, true), (removed["removed"], removed["refused"].IsNil));
         Assert.False(_game.Has("Patch/Level_Cap.rb"));
+        Assert.Equal(ModStatus.Available, StatusOf("site:level-cap"));
         Assert.Equal("Level Cap cannot be removed here. Delete its files from the Patch folder.", again["refused"].AsText());
     }
 
@@ -651,6 +657,14 @@ public void Needs_ListsWhatInstallsTurnsOnOrComesFromItsAuthor()
         _ui.Value(ModsTopics.CheckTopic, request).AsHash()["rows"].AsArray()
             .Select(row => new[] { "kind", "name", "title", "saved", "installed", "target" }.Select(key => row.AsHash()[key].AsText()).ToArray())
             .ToList();
+
+    /// <summary>
+    /// Asks the browser how a mod stands.
+    /// </summary>
+    /// <param name="id">The mod's id.</param>
+    /// <returns>Its status, see <see cref="ModStatus"/>.</returns>
+    private string StatusOf(string id) =>
+        _ui.Value(ModsTopics.BrowseTopic).AsHash()["mods"].AsArray().Select(mod => mod.AsHash()).First(mod => mod["id"].AsText() == id)["status"].AsText();
 
     /// <summary>
     /// Reads Mods.ini.

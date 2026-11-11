@@ -2,6 +2,7 @@
 //  ModScan.cs
 //
 //  Changelog:
+//      Paulinchen  2026-11-11: Kept the hashes of each file read until its length or write time changes
 //      Paulinchen  2026-11-09: Caught every error of the search for old DLLs
 //      Paulinchen  2026-11-07: Used the bridge and the runtime under the framework's namespace
 //      Paulinchen  2026-10-30: Moved into the Mod Framework as ModScan, from PatchScan
@@ -13,6 +14,7 @@
 //----------------------------------------------------------------
 
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -27,6 +29,15 @@ namespace MGQParadox.ModFramework.Mods;
 internal static class ModScan
 {
     /// <summary>
+    /// The hashes of each file read, by its full path, kept until its length or write time changes.
+    /// </summary>
+    /// <remarks>
+    /// A file rewritten with the same length within the write time's resolution, two seconds on FAT and exFAT, keeps its
+    /// old hashes; every write by an install or a removal goes through the bytes instead.
+    /// </remarks>
+    private static readonly ConcurrentDictionary<string, KeptHashes> Memo = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>
     /// Tells how each mod stands in the Patch folder.
     /// </summary>
     /// <param name="mods">The mods.</param>
@@ -36,14 +47,14 @@ internal static class ModScan
     public static IReadOnlyDictionary<string, ModState> Detect(IReadOnlyList<BrowsedMod> mods, string gameFolder, bool logged = true)
     {
         var patch = PatchFolder.PathOf(gameFolder);
-        var read = new Dictionary<string, (bool Exists, byte[]? Bytes)>(StringComparer.OrdinalIgnoreCase);
+        var read = new Dictionary<string, (bool Exists, FileHashes? Hashes)>(StringComparer.OrdinalIgnoreCase);
         var states = new Dictionary<string, ModState>(StringComparer.Ordinal);
 
-        (bool Exists, byte[]? Bytes) FileAt(string path)
+        (bool Exists, FileHashes? Hashes) FileAt(string path)
         {
             if (!read.TryGetValue(path, out var file))
             {
-                read[path] = file = ReadFile(patch, path);
+                read[path] = file = HashesOf(patch, path);
             }
 
             return file;
@@ -51,7 +62,7 @@ internal static class ModScan
 
         foreach (var mod in mods)
         {
-            var installed = mod.Known.FirstOrDefault(version => version.Files.All(file => FileAt(file.Key).Bytes is { } bytes && ModHash.Matches(file.Key, bytes, file.Value)));
+            var installed = mod.Known.FirstOrDefault(version => version.Files.All(file => FileAt(file.Key).Hashes is { } hashes && ModHash.Matches(hashes, file.Value)));
             var state = installed != null
                 ? new ModState(ModMerge.CompareVersions(mod.Latest, installed.Version) > 0 ? ModStatus.Update : ModStatus.Current, installed)
                 : new ModState(mod.Known.SelectMany(version => version.Files.Keys).Any(path => FileAt(path).Exists) ? ModStatus.Changed : ModStatus.Available, null);
@@ -207,21 +218,37 @@ internal static class ModScan
     }
 
     /// <summary>
-    /// Reads a file inside the Patch folder, found whatever the case of its name.
+    /// Hashes a file inside the Patch folder, found whatever the case of its name, reading it again
+    /// only when it is new or its length or write time changed.
     /// </summary>
     /// <param name="patch">The Patch folder's full path.</param>
     /// <param name="path">The path inside it.</param>
-    /// <returns>Whether it exists, and its bytes; none for a file missing, outside Patch or that cannot be read.</returns>
-    private static (bool Exists, byte[]? Bytes) ReadFile(string patch, string path)
+    /// <returns>Whether it exists, and its hashes; none for a file missing, outside Patch or that cannot be read.</returns>
+    private static (bool Exists, FileHashes? Hashes) HashesOf(string patch, string path)
     {
-        if (FolderGuard.Inside(patch, PatchFolder.Resolve(patch, path)) is not { } full || !File.Exists(full))
+        if (FolderGuard.Inside(patch, PatchFolder.Resolve(patch, path)) is not { } full)
         {
             return (false, null);
         }
 
         try
         {
-            return (true, File.ReadAllBytes(full));
+            var info = new FileInfo(full);
+
+            if (!info.Exists)
+            {
+                Memo.TryRemove(full, out _);
+                return (false, null);
+            }
+
+            if (Memo.TryGetValue(full, out var kept) && kept.Length == info.Length && kept.Written == info.LastWriteTimeUtc)
+            {
+                return (true, kept.Hashes);
+            }
+
+            var hashes = ModHash.Hashes(path, File.ReadAllBytes(full));
+            Memo[full] = new KeptHashes(info.Length, info.LastWriteTimeUtc, hashes);
+            return (true, hashes);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
@@ -229,4 +256,12 @@ internal static class ModScan
             return (true, null);
         }
     }
+
+    /// <summary>
+    /// The hashes of a file as it was when it was read.
+    /// </summary>
+    /// <param name="Length">Its length then.</param>
+    /// <param name="Written">Its write time then, in UTC.</param>
+    /// <param name="Hashes">Its hashes.</param>
+    private sealed record KeptHashes(long Length, DateTime Written, FileHashes Hashes);
 }
