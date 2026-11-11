@@ -2,6 +2,7 @@
 #  input.rbx
 #
 #  Changelog:
+#      Paulinchen  2026-11-11: Took whether a button went down on a gamepad from the DLL instead of a key rule of its own
 #      Paulinchen  2026-11-09: Checked the memory at the end of a frame
 #      Paulinchen  2026-11-07: Asked C# which cancel keys leave the text field typing now
 #                            - Told typing from the text box open in place of a flag of another mod
@@ -894,11 +895,9 @@ module Mod_Framework
         private_class_method :named
       end
 
-      # A gamepad's presses of the game's buttons, told apart from the keyboard's: a button counts as
-      # the gamepad's when it went down past the capture while none of the keyboard's keys the game
-      # reads as it is held or went down. The keys are those the player bound in the game's F1
-      # settings, as the DLL read them, and the game's own until it did. The keyboard's keys count
-      # from the frame after the first ask, so a mod asks every frame from when it listens.
+      # A gamepad's presses of the game's buttons, told apart from the keyboard's as the DLL tells it,
+      # and the keyboard's keys of each button as the player bound them in the game's F1 settings,
+      # as the DLL read them, and the game's own until it did.
       module Pad
         # The keyboard's keys the game reads as each of its buttons by default, as Windows codes.
         KEYS = { :A => [0x10], :B => [0x1B, 0x58, 0x60, 0x2D], :C => [0x20, 0x0D, 0x5A], :X => [0x41], :Y => [0x53], :Z => [0x44],
@@ -964,18 +963,17 @@ module Mod_Framework
           code && (KEY_NAMES[code] || code.chr)
         end
 
-        # Tells whether a gamepad's button went down in this frame, as Input.trigger? tells it.
+        # Tells whether a gamepad's button went down in this frame, as Input.trigger? tells it: the
+        # button went down past the capture, and the DLL told this frame's tick that the gamepad was
+        # used last.
         #
         # @param button [Symbol] The game's button: :A, :B, :C, :X, :Y, :Z, :L or :R.
-        # @return [Boolean] Whether it went down on a gamepad; false for another button.
+        # @return [Boolean] Whether it went down on a gamepad; false for another button and without
+        #   the DLL.
         def self.trigger?(button)
           return false unless KEYS[button]
 
-          codes = keys(button)
-          Key.watch(*codes)
-          return false unless Capture.trigger?(button)
-
-          codes.none? { |code| Key.down?(code) || Key.triggered?(code) }
+          Capture.trigger?(button) && last? ? true : false
         end
       end
     end
@@ -1385,11 +1383,9 @@ module Mod_Framework
     # Tells whether one of the game's buttons went down on a gamepad in this frame, so the pad's
     # shoulders can do what the keyboard's Q and W do not.
     #
-    # The keyboard's keys count from the frame after the first ask, so ask every frame from when
-    # your screen listens.
-    #
     # @param button [Symbol] The game's button: :A, :B, :C, :X, :Y, :Z, :L or :R.
-    # @return [Boolean] Whether it went down on a gamepad; false for another button.
+    # @return [Boolean] Whether it went down on a gamepad; false for another button and without the
+    #   DLL.
     def self.pad_trigger?(button)
       Engine::Pad.trigger?(button)
     end

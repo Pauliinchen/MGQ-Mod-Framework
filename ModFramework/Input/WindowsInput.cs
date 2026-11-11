@@ -2,6 +2,7 @@
 //  WindowsInput.cs
 //
 //  Changelog:
+//      Paulinchen  2026-11-11: Handed out the keys that sent the game's window a key message
 //      Paulinchen  2026-11-07: Used the bridge and the runtime under the framework's namespace
 //      Paulinchen  2026-10-31: Read the game's key settings of F1 from the registry
 //      Paulinchen  2026-10-28: Created
@@ -82,6 +83,9 @@ internal sealed partial class WindowsInput : IInputSource
 
     /// <inheritdoc />
     public int TakeWheel() => GameWindow.Wheel.Take();
+
+    /// <inheritdoc />
+    public void TakeKeyPresses(Span<ulong> into) => GameWindow.KeyPresses.Take(into);
 
     /// <inheritdoc />
     public byte[]? ButtonAssign()

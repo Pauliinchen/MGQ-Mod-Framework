@@ -2,6 +2,7 @@
 //  ComponentTreeKeys.cs
 //
 //  Changelog:
+//      Paulinchen  2026-11-11: Asked the input model whether cancel, confirm, the shoulders and the jump button came from a gamepad
 //      Paulinchen  2026-11-09: Let cancel on the part a window opened on close it instead of walking a way back or sliding back
 //                            - Let the keys that step tabs pass over tabs that show a single tab
 //      Paulinchen  2026-11-07: Moved an item carried between drop zones by the arrows and put it back by cancel
@@ -455,7 +456,7 @@ internal sealed partial class ComponentTree
     /// <returns>Whether it does.</returns>
     private bool PadJumpHeld(Node root) =>
         _host.ExtraButtons.Pressed(UiExtraButton.A) && (root.HeldExtraAtOpen & (1 << (int)UiExtraButton.A)) == 0 &&
-        !Keys().Binding.KeysOf(nameof(UiExtraButton.A)).Any(_input.KeyDown);
+        !_input.FromKeyboard(UiExtraButton.A);
 
     /// <summary>
     /// Moves the focus by an arrow with the jump keys held out of the focused part, as if a list did
@@ -910,7 +911,7 @@ internal sealed partial class ComponentTree
     /// steps the root's tabs that Tab steps, else moves the focus in a window
     /// or dialog, UP and DOWN, of the keyboard or a gamepad, step what a numeric field types unless the
     /// jump keys are held and leave any other field of one line; the game's
-    /// cancel and confirm count only from a gamepad, when no key of theirs went down, so a letter
+    /// cancel and confirm count only from a gamepad, as the input model tells it, so a letter
     /// bound to cancel types its letter. A gamepad's L
     /// and R step the root's tabs that the pad's shoulders step, and its UP and DOWN reach a field
     /// that claims the arrow keys as those keys, so they scroll what it steers or pick a completion.
@@ -933,7 +934,7 @@ internal sealed partial class ComponentTree
 
         bool Went(int code) => !claimed.Contains(code) && _input.WentDown(code);
         var keys = Keys();
-        bool padCancel = buttons.Triggered(UiButton.Cancel) && !AnyDown(keys.CancelBound);
+        bool padCancel = _input.PadPressed(buttons, UiButton.Cancel);
         int? by = new[] { EscapeKey, InsertKey }.Concat(keys.CancelBound).Append(NumpadZero).FirstOrDefault(candidate => Went(candidate) && LeavesField(field, candidate)) is int found and not 0 ? found : null;
         if ((by is not null || padCancel) && field.ConfirmToType)
         {
@@ -978,7 +979,7 @@ internal sealed partial class ComponentTree
             return;
         }
 
-        if (buttons.Triggered(UiButton.Confirm) && !AnyDown(keys.Confirm))
+        if (_input.PadPressed(buttons, UiButton.Confirm))
         {
             Event(field.Id, "submit");
         }
@@ -1064,13 +1065,6 @@ internal sealed partial class ComponentTree
         _keys = (binding, confirm, cancel, shoulder, bound);
         return _keys.Value;
     }
-
-    /// <summary>
-    /// Tells whether any of some keys went down at this tick or is held.
-    /// </summary>
-    /// <param name="codes">Windows' codes of the keys.</param>
-    /// <returns>Whether one did or is.</returns>
-    private bool AnyDown(int[] codes) => codes.Any(code => _input.WentDown(code) || _input.KeyDown(code));
 
     /// <summary>
     /// Tells whether a cancel key leaves a focused text field, see <see cref="KeyNames.LeavesField"/>.
@@ -1206,7 +1200,7 @@ internal sealed partial class ComponentTree
         if (buttons.Triggered(UiButton.Cancel) || numpadZero)
         {
             _heldConfirm = null;
-            _padCancel = !numpadZero && !AnyDown(Keys().CancelBound) && !AnyDown([EscapeKey]);
+            _padCancel = !numpadZero && _input.PadPressed(buttons, UiButton.Cancel);
             bool cancelled = Cancel();
             _padCancel = false;
             return cancelled && numpadZero;
@@ -1521,18 +1515,15 @@ internal sealed partial class ComponentTree
     }
 
     /// <summary>
-    /// Tells which way a gamepad's shoulder button went down: the game's L or R in a tick in which
-    /// none of the keyboard's keys of those buttons is held or went down.
+    /// Tells which way a gamepad's shoulder button went down: the game's L or R as the input model
+    /// tells it a gamepad's.
     /// </summary>
-    /// <remarks>
-    /// A key the player bound to L or R in the game's F1 settings counts as the gamepad's.
-    /// </remarks>
     /// <param name="buttons">The game's buttons of the tick.</param>
     /// <returns>-1 for L, 1 for R, 0 for neither.</returns>
     private int PadShoulder(UiButtons buttons)
     {
         int step = buttons.Triggered(UiButton.L) ? -1 : buttons.Triggered(UiButton.R) ? 1 : 0;
-        return step != 0 && !AnyDown(Keys().Shoulder) ? step : 0;
+        return step != 0 && !_input.FromKeyboard(step < 0 ? UiButton.L : UiButton.R) ? step : 0;
     }
 
     /// <summary>

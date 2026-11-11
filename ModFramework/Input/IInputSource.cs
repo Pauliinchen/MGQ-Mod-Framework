@@ -2,6 +2,7 @@
 //  IInputSource.cs
 //
 //  Changelog:
+//      Paulinchen  2026-11-11: Handed out the keys that sent the game's window a key message
 //      Paulinchen  2026-11-07: Used the bridge and the runtime under the framework's namespace
 //      Paulinchen  2026-10-31: Read the game's key settings of F1
 //      Paulinchen  2026-10-30: Took what the scripts read of the devices, for JoiPlay
@@ -9,6 +10,7 @@
 //
 //----------------------------------------------------------------
 
+using System;
 using MGQParadox.ModFramework.Bridge.Ruby;
 
 namespace MGQParadox.ModFramework.Input;
@@ -67,6 +69,13 @@ internal interface IInputSource
     /// </summary>
     /// <returns>The notches, positive away from the player.</returns>
     int TakeWheel();
+
+    /// <summary>
+    /// Takes the keys that sent the game's window a key message since the last take.
+    /// </summary>
+    /// <param name="into">Where the keys go as a set of every key code, see
+    /// <see cref="Windows.KeyPresses"/>; a source without key messages leaves it empty.</param>
+    void TakeKeyPresses(Span<ulong> into) => into.Clear();
 
     /// <summary>
     /// Reads the game's key settings of F1, RGSS3's ButtonAssign.

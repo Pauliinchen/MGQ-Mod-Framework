@@ -2,6 +2,7 @@
 //  ComponentTreeMouse.cs
 //
 //  Changelog:
+//      Paulinchen  2026-11-11: Asked the input model whether confirm held for the context menu came from a gamepad
 //      Paulinchen  2026-11-09: Kept the rows of a list inside what is left of its padding
 //      Paulinchen  2026-11-07: Dragged an item of a drop zone by the pointer into a zone
 //                            - Set a slider at the pointer by a click or a drag, and filled a rating up to the cell clicked
@@ -199,7 +200,7 @@ internal sealed partial class ComponentTree
             return true;
         }
 
-        if (buttons.Triggered(UiButton.Confirm) && !AnyDown(Keys().Confirm) && _focus is { } focus && Focus.RootOf(focus).Layer && ContextPart(focus) is not null
+        if (_input.PadPressed(buttons, UiButton.Confirm) && _focus is { } focus && Focus.RootOf(focus).Layer && ContextPart(focus) is not null
             && !(focus.Kind == NodeKind.List && focus.DisabledRows.Contains(focus.Cursor)))
         {
             _heldConfirm = (focus, 0);

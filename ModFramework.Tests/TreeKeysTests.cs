@@ -2,6 +2,7 @@
 //  TreeKeysTests.cs
 //
 //  Changelog:
+//      Paulinchen  2026-11-11: Checked that a typing text field takes a key tap the poll missed as the keyboard's
 //      Paulinchen  2026-11-09: Checked that a gamepad's shoulder passes tabs that show a single tab on to the window's page
 //      Paulinchen  2026-11-07: Used the bridge and the runtime under the framework's namespace
 //      Paulinchen  2026-11-06: Checked that the tabs the arrows step pass over a reading pane only the jump key reaches
@@ -23,8 +24,8 @@ namespace MGQParadox.ModFramework.Tests;
 /// <summary>
 /// Covers the keys of the component tree beyond the arrows: tabs stepped by Tab, the shoulders and
 /// the arrows, the shoulders and page keys reaching the root's page, tabs that are one key stop, the
-/// keys a text field claims and those the tree takes from the hotkeys, the hotkeys parts declare,
-/// and the game's extra buttons.
+/// keys a text field claims and those the tree takes from the hotkeys, a key tap a typing field
+/// tells from a gamepad, the hotkeys parts declare, and the game's extra buttons.
 /// </summary>
 public sealed class TreeKeysTests
 {
@@ -240,6 +241,33 @@ public sealed class TreeKeysTests
         fields.Input.Down.Clear();
         fields.Frame();
         Assert.Equal(4, Focus(fields.Repeat(UiButton.Down)));
+    }
+
+    /// <summary>
+    /// Asserts that a typing text field of the new UI layer takes a key tap the key poll missed as
+    /// the keyboard's, as in a chat line sent at its first space: a tapped Space with the game's
+    /// confirm, a tapped X with its cancel and a tapped Q with its L only type, while a tapped Escape
+    /// still stops the typing; a gamepad's confirm submits, its L steps the tabs and its cancel stops
+    /// the typing.
+    /// </summary>
+    [Fact]
+    public void TypingField_TakesAKeyTapThePollMissedAsTheKeyboards()
+    {
+        var chat = new TreeHarness(new FakeTyping());
+        chat.Frame(Adds(
+            Node(1, null, "window", ("layer", true)),
+            Node(2, 1, "tabs"),
+            Node(3, 1, "text_field", Measured(100, 24))));
+        chat.Frame(new RubyHash { { "focus", 3 } });
+
+        Assert.Empty(Events(chat.Tap(ComponentTree.SpaceKey, Triggered(UiButton.Confirm))));
+        Assert.Empty(Events(chat.Tap(ComponentTree.XKey, Triggered(UiButton.Cancel))));
+        Assert.Empty(Events(chat.Tap(ComponentTree.QKey, Triggered(UiButton.L))));
+        Assert.Equal(["3 submit"], Events(chat.Press(UiButton.Confirm)));
+        Assert.Equal(["2 step -1"], Events(chat.Press(UiButton.L)));
+        Assert.Equal(["3 rest"], Events(chat.Tap(ComponentTree.EscapeKey, Triggered(UiButton.Cancel))));
+        chat.Frame(Set(3, "typing", true));
+        Assert.Equal(["3 rest"], Events(chat.Press(UiButton.Cancel)));
     }
 
     /// <summary>

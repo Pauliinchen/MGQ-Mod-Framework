@@ -121,7 +121,7 @@ the key help, "D: Filter".
   buttons.
 - `UI.pad_trigger?(:L)` tells whether one of the game's buttons went down on a gamepad in this
   frame and not on the keyboard, so the pad's shoulders step the tabs of a sprite of your own while
-  Q and W stay for its page. Ask it every frame from when your sprite listens.
+  Q and W stay for its page.
 
 <!-- nav -->
 ---

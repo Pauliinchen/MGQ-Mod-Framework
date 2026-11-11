@@ -2,6 +2,7 @@
 //  GameWindow.cs
 //
 //  Changelog:
+//      Paulinchen  2026-11-11: Noted every key that went down, typing or not, for the input model
 //      Paulinchen  2026-11-09: Noted a failure of the window procedure without making objects
 //      Paulinchen  2026-11-07: Used the bridge and the runtime under the framework's namespace
 //      Paulinchen  2026-10-28: Moved into the Mod Framework
@@ -30,8 +31,8 @@ using MGQParadox.ModFramework.Runtime;
 namespace MGQParadox.ModFramework.Windows;
 
 /// <summary>
-/// The game's window, whose one hook the framework owns: it feeds the keyboard, the mouse wheel and
-/// the Alt guard, and keeps the game running while another application is active when asked to.
+/// The game's window, whose one hook the framework owns: it feeds the keyboard, the keys that went
+/// down, the mouse wheel and the Alt guard, and keeps the game running while another application is active when asked to.
 /// </summary>
 internal static unsafe partial class GameWindow
 {
@@ -101,6 +102,11 @@ internal static unsafe partial class GameWindow
     public static MouseWheel Wheel { get; } = new();
 
     /// <summary>
+    /// The keys that went down in the window, typing or not, which the input model takes each tick.
+    /// </summary>
+    public static KeyPresses KeyPresses { get; } = new();
+
+    /// <summary>
     /// Hooks the game's window, once.
     /// </summary>
     /// <returns><see langword="true"/> when the window is hooked.</returns>
@@ -166,7 +172,8 @@ internal static unsafe partial class GameWindow
     /// <summary>
     /// Hands every message on, telling the game its application is active whenever Windows says
     /// either while it keeps running, passing what is typed to <see cref="Keyboard"/> while it wants
-    /// it, and gathering the mouse wheel's turns in <see cref="Wheel"/>.
+    /// it, noting each key that went down in <see cref="KeyPresses"/> and gathering the mouse wheel's
+    /// turns in <see cref="Wheel"/>.
     /// </summary>
     /// <remarks>
     /// Nothing may throw out of it, since an exception crossing into the game ends it.
@@ -182,6 +189,10 @@ internal static unsafe partial class GameWindow
         try
         {
             var typing = Keyboard.Active;
+            if (message is KeyDown or SystemKeyDown)
+            {
+                KeyPresses.Note((int)wParam & 0xFF);
+            }
 
             if (message == SystemKeyDown)
             {

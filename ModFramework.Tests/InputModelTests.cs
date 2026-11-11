@@ -2,6 +2,7 @@
 //  InputModelTests.cs
 //
 //  Changelog:
+//      Paulinchen  2026-11-11: Checked keys whose key message comes while the poll misses them, and late messages of held keys
 //      Paulinchen  2026-11-07: Used the bridge and the runtime under the framework's namespace
 //      Paulinchen  2026-11-05: Checked that a tick the same as the last one posted posts nothing, and read such a tick as
 //                              the scripts hold the last event
@@ -139,8 +140,10 @@ public sealed class InputModelTests
 
     /// <summary>
     /// Asserts that a watched key tells going down once and then being held, a key already held as
-    /// its watch starts does not go down, an unwatched key is left out, the wheel hands its notches
-    /// out once, and a key code Windows does not have refuses the whole tick.
+    /// its watch starts does not go down, a held key whose key message comes late does not go down
+    /// again, a tap the poll misses goes down once by its key message, an unwatched key is left out,
+    /// the wheel hands its notches out once, and a key code Windows does not have refuses the whole
+    /// tick.
     /// </summary>
     [Fact]
     public void Keys_TellTheWatchedKeysAndTheWheel()
@@ -151,12 +154,22 @@ public sealed class InputModelTests
         _input.Notches = -2;
         RubyHash first = Tick();
         var second = Tick()["keys"];
+        _input.Presses.Note(NumpadZero);
+        var late = Tick()["keys"];
+        _input.Down.Remove(NumpadZero);
+        Tick();
+        _input.Presses.Note(NumpadZero);
+        var tapped = Tick()["keys"];
+        var afterTap = Tick()["keys"];
         var unwatched = Tick(new RubyHash { { "unwatch", new RubyArray { NumpadZero, 0x41 } } });
         RubyHash? refused = _ui.Call(UiHost.TickTopic, new RubyHash { { InputModel.ModelName, new RubyHash { { "watch", new RubyArray { 0x100 } } } } });
 
         Assert.Equal(new RubyHash { { 0x41, InputModel.KeyHeld } }, heldBefore);
         Assert.Equal(new RubyHash { { 0x41, InputModel.KeyHeld }, { NumpadZero, InputModel.KeyHeld | InputModel.KeyWentDown } }, first["keys"]);
         Assert.Equal(new RubyHash { { 0x41, InputModel.KeyHeld }, { NumpadZero, InputModel.KeyHeld } }, second);
+        Assert.Equal(second, late);
+        Assert.Equal(new RubyHash { { 0x41, InputModel.KeyHeld }, { NumpadZero, InputModel.KeyWentDown } }, tapped);
+        Assert.Equal(new RubyHash { { 0x41, InputModel.KeyHeld } }, afterTap);
         Assert.Equal(new RubyHash(), unwatched["keys"]);
         Assert.Equal([-2, 0], [first["wheel"].AsInt(), unwatched["wheel"].AsInt()]);
         Assert.Equal(BridgeEnvelope.BadRequest, refused!["error"].AsText());
@@ -243,10 +256,11 @@ public sealed class InputModelTests
 
     /// <summary>
     /// Asserts that a game button that goes down with none of its keys held counts as a gamepad's
-    /// until a key goes down, and that DOWN with its arrow key held counts as the keyboard.
+    /// until a key goes down, that DOWN with its arrow key held counts as the keyboard, and that
+    /// confirm with a Space the poll missed counts as the keyboard by its key message.
     /// </summary>
     [Fact]
-    public void Device_IsThePadOnlyWhileNoKeyOfTheButtonIsHeld()
+    public void Device_IsThePadOnlyWhileNoKeyOfTheButtonIsHeldOrMessaged()
     {
         Tick(new RubyHash { { "watch", new RubyArray { 0x41 } } });
         int confirm = 1 << (int)UiButton.Confirm;
@@ -259,6 +273,10 @@ public sealed class InputModelTests
         Assert.True(Tick(buttons: confirm)["pad"].AsBool());
         _input.Down.Add(0x28);
         Assert.False(Tick(buttons: 1 << (int)UiButton.Down)["pad"].AsBool());
+        _input.Down.Clear();
+        _input.Presses.Note(0x20);
+        Assert.False(Tick(buttons: confirm)["pad"].AsBool());
+        Assert.True(Tick(buttons: confirm)["pad"].AsBool());
     }
 
     /// <summary>

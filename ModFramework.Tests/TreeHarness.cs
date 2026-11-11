@@ -2,6 +2,7 @@
 //  TreeHarness.cs
 //
 //  Changelog:
+//      Paulinchen  2026-11-11: Tapped a key whose key message comes while the key poll misses it
 //      Paulinchen  2026-11-07: Used the bridge and the runtime under the framework's namespace
 //      Paulinchen  2026-11-04: Added the text box on a keyboard, the layout's offers, held and repeated buttons, a key held
 //                              for a frame, several properties set at once, measured sizes, the focus of a report, a font
@@ -289,6 +290,21 @@ internal sealed class TreeHarness
         Input.Down.Add(code);
         RubyHash report = Frame(buttons: buttons);
         Input.Down.Remove(code);
+        Frame();
+        return report;
+    }
+
+    /// <summary>
+    /// Taps a key so briefly that the key poll misses it while its key message comes, with the game's
+    /// buttons it brings, and runs the next frame with nothing pressed.
+    /// </summary>
+    /// <param name="code">Windows' code of the key.</param>
+    /// <param name="buttons">The game's buttons of the frame, as bits.</param>
+    /// <returns>The report of the frame it went down in.</returns>
+    public RubyHash Tap(int code, int buttons = 0)
+    {
+        Input.Presses.Note(code);
+        RubyHash report = Frame(buttons: buttons);
         Frame();
         return report;
     }

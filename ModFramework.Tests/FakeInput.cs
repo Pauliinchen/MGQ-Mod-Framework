@@ -2,15 +2,18 @@
 //  FakeInput.cs
 //
 //  Changelog:
+//      Paulinchen  2026-11-11: Handed out the key messages a test notes
 //      Paulinchen  2026-11-04: Added the key settings of F1 with one key bound otherwise and a keyboard that types
 //      Paulinchen  2026-10-31: Answered the key settings of F1 a test sets
 //      Paulinchen  2026-10-28: Created
 //
 //----------------------------------------------------------------
 
+using System;
 using System.Collections.Generic;
 using MGQParadox.ModFramework.Input;
 using MGQParadox.ModFramework.Ui.Text;
+using MGQParadox.ModFramework.Windows;
 
 namespace MGQParadox.ModFramework.Tests;
 
@@ -33,6 +36,11 @@ internal sealed class FakeInput : IInputSource
     /// Gets the codes of the keys and physical buttons held.
     /// </summary>
     public HashSet<int> Down { get; } = [];
+
+    /// <summary>
+    /// Gets the keys that sent the game's window a key message, which the next take hands out.
+    /// </summary>
+    public KeyPresses Presses { get; } = new();
 
     /// <summary>
     /// Gets or sets whether the mouse buttons are swapped.
@@ -86,6 +94,9 @@ internal sealed class FakeInput : IInputSource
         Notches = 0;
         return notches;
     }
+
+    /// <inheritdoc />
+    public void TakeKeyPresses(Span<ulong> into) => Presses.Take(into);
 }
 
 /// <summary>

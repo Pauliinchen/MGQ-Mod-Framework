@@ -2,6 +2,8 @@
 //  InputModel.cs
 //
 //  Changelog:
+//      Paulinchen  2026-11-11: Told a button the keyboard's while one of its keys is held or sent a key message since the tick before
+//                            - Counted a key as gone down once its key message came, also where the poll missed it
 //      Paulinchen  2026-11-07: Used the bridge and the runtime under the framework's namespace
 //      Paulinchen  2026-11-05: Posted no event for a tick the same as the last one posted, so an idle frame makes the scripts no objects
 //      Paulinchen  2026-11-04: Told the scripts whether the player used a gamepad last
@@ -20,6 +22,7 @@ using System.Linq;
 using MGQParadox.ModFramework.Bridge;
 using MGQParadox.ModFramework.Bridge.Ruby;
 using MGQParadox.ModFramework.Ui;
+using MGQParadox.ModFramework.Windows;
 
 namespace MGQParadox.ModFramework.Input;
 
@@ -104,7 +107,8 @@ internal sealed class InputModel : IUiModel
     public const int KeyHeld = 1 << 0;
 
     /// <summary>
-    /// The bit of a watched key's state when it went down at this tick.
+    /// The bit of a watched key's state when it went down at this tick: up at the tick before, and
+    /// held now or sent a key message since.
     /// </summary>
     public const int KeyWentDown = 1 << 1;
 
@@ -158,6 +162,12 @@ internal sealed class InputModel : IUiModel
     /// The keys the other models watch that went down at the last tick while the game was in front.
     /// </summary>
     private readonly HashSet<int> _wentDown = [];
+
+    /// <summary>
+    /// The keys that sent the game's window a key message between the last tick and the one before,
+    /// as a set of <see cref="KeyPresses.Words"/> words; empty while another window was in front.
+    /// </summary>
+    private readonly ulong[] _pressed = new ulong[KeyPresses.Words];
 
     /// <summary>
     /// Where it reads the input.
@@ -295,8 +305,9 @@ internal sealed class InputModel : IUiModel
     public int Notches { get; private set; }
 
     /// <summary>
-    /// Gets whether the player used a gamepad last: one of the game's buttons went down with none of
-    /// its keyboard keys held; a key or a mouse button going down counts as the keyboard.
+    /// Gets whether the player used a gamepad last: one of the game's buttons went down and none of
+    /// them comes from the keyboard, see <see cref="FromKeyboard(UiButton)"/>; a key or a mouse
+    /// button going down counts as the keyboard.
     /// </summary>
     public bool PadLast { get; private set; }
 
@@ -346,6 +357,42 @@ internal sealed class InputModel : IUiModel
     public bool WentDown(int code) => _wentDown.Contains(code);
 
     /// <summary>
+    /// Tells whether one of the game's buttons comes from the keyboard at the last tick: one of its
+    /// keys, those F1 binds to it or a direction's arrow key, is held now or sent a key message
+    /// since the tick before.
+    /// </summary>
+    /// <param name="button">The button.</param>
+    /// <returns>Whether it does.</returns>
+    public bool FromKeyboard(UiButton button)
+    {
+        foreach ((UiButton each, string? bound, int[] own) in ButtonKeys)
+        {
+            if (each == button)
+            {
+                return AnyFromKeyboard(own) || (bound is not null && AnyFromKeyboard(Assignment.KeysOf(bound)));
+            }
+        }
+
+        return false;
+    }
+
+    /// <summary>
+    /// Tells whether one of the game's extra buttons comes from the keyboard at the last tick, see
+    /// <see cref="FromKeyboard(UiButton)"/>.
+    /// </summary>
+    /// <param name="button">The button.</param>
+    /// <returns>Whether it does.</returns>
+    public bool FromKeyboard(UiExtraButton button) => AnyFromKeyboard(Assignment.KeysOf(button.ToString()));
+
+    /// <summary>
+    /// Tells whether one of the game's buttons went down on a gamepad at the last tick.
+    /// </summary>
+    /// <param name="buttons">The game's buttons of the tick, as the caller takes them.</param>
+    /// <param name="button">The button.</param>
+    /// <returns>Whether it went down and does not come from the keyboard.</returns>
+    public bool PadPressed(UiButtons buttons, UiButton button) => buttons.Triggered(button) && !FromKeyboard(button);
+
+    /// <summary>
     /// Takes the scripts' changes, reads the frame's input and posts it as <see cref="EventTopic"/>:
     /// {"mouse" => [x, y] or nil, "buttons" => bits, "double" => bool, "wheel" => notches,
     /// "keys" => {code => bits} for the watched keys held or gone down, "front" => bool}, while in
@@ -368,6 +415,12 @@ internal sealed class InputModel : IUiModel
         }
 
         var front = _source.GameInFront();
+        _source.TakeKeyPresses(_pressed);
+        if (!front)
+        {
+            Array.Clear(_pressed);
+        }
+
         if (front && _readAssignment)
         {
             ReadAssignment();
@@ -441,20 +494,20 @@ internal sealed class InputModel : IUiModel
     }
 
     /// <summary>
-    /// Notes the device the player used last: a game button that went down with none of its keyboard
-    /// keys held is a gamepad's, one with a key held the keyboard's; without one, a watched key or a
-    /// mouse button that went down counts as the keyboard.
+    /// Notes the device the player used last: a game button that went down is a gamepad's unless it
+    /// comes from the keyboard, see <see cref="FromKeyboard(UiButton)"/>; without one, a watched key
+    /// or a mouse button that went down counts as the keyboard.
     /// </summary>
     /// <param name="keys">The watched keys held or gone down, with their bits.</param>
     /// <param name="clicked">Whether a mouse button went down.</param>
     private void FollowDevice(RubyHash keys, bool clicked)
     {
         bool? pad = null;
-        foreach ((UiButton button, string? bound, int[] own) in ButtonKeys)
+        foreach ((UiButton button, _, _) in ButtonKeys)
         {
             if (_host.Buttons.Triggered(button))
             {
-                pad = (pad ?? true) && !KeyboardHolds(bound, own);
+                pad = (pad ?? true) && !FromKeyboard(button);
             }
         }
 
@@ -462,7 +515,7 @@ internal sealed class InputModel : IUiModel
         {
             if (_host.ExtraButtons.Triggered(button))
             {
-                pad = (pad ?? true) && !KeyboardHolds(button.ToString(), []);
+                pad = (pad ?? true) && !FromKeyboard(button);
             }
         }
 
@@ -475,14 +528,23 @@ internal sealed class InputModel : IUiModel
     }
 
     /// <summary>
-    /// Tells whether a keyboard key of one of the game's buttons is held: one F1 binds to it or one
-    /// of its own.
+    /// Tells whether one of some keys is held now or sent a key message since the tick before the
+    /// last.
     /// </summary>
-    /// <param name="bound">The button's name in F1, such as "C"; null for a direction.</param>
-    /// <param name="own">The keys it has besides those F1 binds.</param>
-    /// <returns>Whether one is.</returns>
-    private bool KeyboardHolds(string? bound, int[] own) =>
-        own.Any(_source.KeyDown) || (bound is not null && Assignment.KeysOf(bound).Any(_source.KeyDown));
+    /// <param name="codes">Windows' codes of the keys.</param>
+    /// <returns>Whether one did.</returns>
+    private bool AnyFromKeyboard(IReadOnlyList<int> codes)
+    {
+        for (int place = 0; place < codes.Count; place++)
+        {
+            if (_source.KeyDown(codes[place]) || KeyPresses.Holds(_pressed, codes[place]))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     /// <summary>
     /// Reads the key settings of F1 and logs them once they differ from the last read, or why the
@@ -632,7 +694,8 @@ internal sealed class InputModel : IUiModel
 
     /// <summary>
     /// Reads the watched keys, keeping each one's state whichever window is in front, so a key held
-    /// while the game comes to the front is not taken as going down.
+    /// while the game comes to the front is not taken as going down; a key up at the tick before
+    /// that sent a key message since went down, also where this poll misses it.
     /// </summary>
     /// <param name="front">Whether the game's window is in front, without which none is reported.</param>
     /// <returns>Each watched key held or gone down, with its bits.</returns>
@@ -642,11 +705,11 @@ internal sealed class InputModel : IUiModel
         foreach (var code in new List<int>(_keys.Keys))
         {
             var down = _source.KeyDown(code);
-            var wentDown = down && !_keys[code];
+            var wentDown = !_keys[code] && (down || KeyPresses.Holds(_pressed, code));
             _keys[code] = down;
-            if (front && down)
+            if (front && (down || wentDown))
             {
-                keys.Add(code, KeyHeld | (wentDown ? KeyWentDown : 0));
+                keys.Add(code, (down ? KeyHeld : 0) | (wentDown ? KeyWentDown : 0));
             }
         }
 
@@ -654,7 +717,8 @@ internal sealed class InputModel : IUiModel
     }
 
     /// <summary>
-    /// Reads the keys the other models watch, keeping each one's state whichever window is in front.
+    /// Reads the keys the other models watch, keeping each one's state whichever window is in front;
+    /// a key goes down as in <see cref="ReadKeys"/>.
     /// </summary>
     /// <param name="front">Whether the game's window is in front, without which none went down.</param>
     private void ReadModelKeys(bool front)
@@ -663,7 +727,7 @@ internal sealed class InputModel : IUiModel
         foreach (var code in new List<int>(_modelKeys.Keys))
         {
             var down = _source.KeyDown(code);
-            if (front && down && !_modelKeys[code])
+            if (front && !_modelKeys[code] && (down || KeyPresses.Holds(_pressed, code)))
             {
                 _wentDown.Add(code);
             }

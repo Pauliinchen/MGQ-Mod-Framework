@@ -2,6 +2,7 @@
 #  keys_test.rb
 #
 #  Changelog:
+#      Paulinchen  2026-11-11: Checked that UI.pad_trigger? takes the DLL's word on the gamepad
 #      Paulinchen  2026-11-06: Added the slots without their add_ helper
 #                            - Called the engine's classes by their names under UI::Engine
 #                            - Checked the gamepad through UI.pad_trigger? and UI.pad?
@@ -48,21 +49,13 @@ in_game_folder do
     frame
     check("a click chooses a slot and confirm submits it", submits, [1])
 
-    # The game's L counts as the gamepad's unless the keyboard's Q went down with it, and the
-    # device used last is told.
-    ui.pad_trigger?(:L)
-    frame
-    frame([:L])
-    check("the game's L alone is the gamepad's", ui.pad_trigger?(:L), true)
-    $keys = { 0x51 => 3 }
-    frame([:L])
-    check("the game's L with the keyboard's Q is the keyboard's", ui.pad_trigger?(:L), false)
-    $keys = {}
+    # The game's L counts as the gamepad's as the DLL tells it at the frame's tick, and so does the
+    # device used last.
     $pad = true
-    frame
-    used = [ui.pad?]
+    frame([:L])
+    pad = [ui.pad_trigger?(:L), ui.pad?]
     $pad = false
-    frame
-    check("UI.pad? tells that the gamepad was used last, and no longer once the keyboard was", used << ui.pad?, [true, false])
+    frame([:L])
+    check("UI.pad_trigger? and UI.pad? tell the gamepad, and the keyboard after it, as the DLL does", [pad, [ui.pad_trigger?(:L), ui.pad?]], [[true, true], [false, false]])
   end
 end
