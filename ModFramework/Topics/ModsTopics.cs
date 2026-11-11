@@ -2,6 +2,7 @@
 //  ModsTopics.cs
 //
 //  Changelog:
+//      Paulinchen  2026-11-11: Planned and wrote changed lines of Mods.ini in one place for every change of the player
 //      Paulinchen  2026-11-07: Started the game again from the game, without the helper
 //                            - Installed the framework and the mods that run into the waiting folder
 //                            - Used the bridge and the runtime under the framework's namespace
@@ -511,6 +512,18 @@ internal sealed partial class ModsTopics
             Reorder(lines, managed, order.AsArray().Select(name => name.AsText()).ToList(), refused);
         }
 
+        return Keep(snapshot, lines, refused).State;
+    }
+
+    /// <summary>
+    /// Plans the mods with changed lines of Mods.ini and writes them, once.
+    /// </summary>
+    /// <param name="snapshot">The plan the lines were changed from.</param>
+    /// <param name="lines">The changed lines in the order the mods load.</param>
+    /// <param name="refused">Why each change was refused.</param>
+    /// <returns>The state after them, see <see cref="SetTopic"/>, and the plan Mods.ini holds now.</returns>
+    private (RubyHash State, PlanResult Plan) Keep(Snapshot snapshot, List<KeyValuePair<string, ModsIniEntry>> lines, RubyArray refused)
+    {
         var plan = ModPlan.Build(snapshot.Installed, lines, _framework);
         var written = snapshot.IniReadable && ModsIni.Write(_game, plan.Ini);
 
@@ -519,10 +532,11 @@ internal sealed partial class ModsTopics
             Log.Write("did not keep the changes to the mods: Mods.ini cannot be read");
         }
 
-        var state = StateOf(snapshot with { Plan = written ? plan : snapshot.Plan });
+        var kept = written ? plan : snapshot.Plan;
+        var state = StateOf(snapshot with { Plan = kept });
         state.Add("written", written);
         state.Add("refused", refused);
-        return state;
+        return (state, kept);
     }
 
     /// <summary>

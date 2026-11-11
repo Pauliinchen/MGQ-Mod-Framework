@@ -2,6 +2,9 @@
 //  ModsTopics.Browse.cs
 //
 //  Changelog:
+//      Paulinchen  2026-11-11: Turned a collection on in its order in one write and told which other mods are on, its needs kept
+//                            - Told the mods of the website an install of a mod also brings, through the mods those need
+//                            - Found a mod by a name whatever the picks of the filters
 //      Paulinchen  2026-11-08: Told which mods the player installs and updates by hand and left them out of the updates
 //      Paulinchen  2026-11-07: Used the bridge and the runtime under the framework's namespace
 //                            - Dropped the update of a removed mod that waited for the next start
@@ -49,7 +52,8 @@ internal sealed partial class ModsTopics
     /// "search" (what the player typed: only the mods and the collections whose texts hold every
     /// word, whatever the case, see <see cref="ModBrowse.Matches"/>),
     /// "picks" => {"categories", "keywords", "languages", "games" => [value, ...], "platform" (see
-    /// <see cref="ModBrowse.PlatformPicks"/>; the one the game runs on without one)}} answers
+    /// <see cref="ModBrowse.PlatformPicks"/>; the one the game runs on without one)}, "find" => a mod's id or a name a
+    /// requirement names it by} answers
     /// {"fetching", "pictures" (whether images are being cached), "site" and
     /// "collections_kept" (whether the cache holds each list), "total" (every mod the lists have),
     /// "collections_total" (every collection the cache holds),
@@ -58,10 +62,12 @@ internal sealed partial class ModsTopics
     /// => [[value, count, picked], ...], "platform" (the one picked), "own_platform" (the one the
     /// game runs on), "platforms" => [value, ...]}, "mods" => [mod, ...] (those the picks let
     /// and the search let through), "updates" => [mod, ...] (every mod an update waits for,
-    /// whatever the picks, but the mods installed by hand), "collections" => [collection, ...] (those the search lets through)}. The mods come in the order asked, whatever they stand
+    /// whatever the picks, but the mods installed by hand), "collections" => [collection, ...] (those the search lets through),
+    /// "found" (with "find" only: the id of the mod it names among every mod of the lists, whatever the picks and the search, or nil)}. The mods come in the order asked, whatever they stand
     /// as in the game folder: {"id", "name", "author", "source", "page", "summary",
     /// "tag", "by_hand" (whether the player installs and updates it by hand from its page on the
-    /// website, see <see cref="BrowsedMod.ByHand"/>), "status" (see <see cref="ModStatus"/>), "installed" (the known version installed or
+    /// website, see <see cref="BrowsedMod.ByHand"/>), "brings" => [id, ...] (the mods of the website an install also needs, as
+    /// <see cref="BringsOf"/> finds them), "status" (see <see cref="ModStatus"/>), "installed" (the known version installed or
     /// nil), "place" (where it lies: "Patch", or "" while not installed), "folder" (its name in
     /// Patch and in Mods.ini), "on" (nil while not installed), "latest",
     /// "bytes", "files", "notes" => [line, ...], "picture" (the cached image's path or nil),
@@ -91,6 +97,14 @@ internal sealed partial class ModsTopics
     /// the least it needs.
     /// </remarks>
     public const string BrowseTopic = "mods.browse";
+
+    /// <summary>
+    /// The topic that turns a collection on: {"id"} turns on its installed mods and puts each tag's
+    /// of them in the collection's order, in one write of Mods.ini, and answers the state of
+    /// <see cref="SetTopic"/> with "others" => [[name, title], ...]: the mods that are on beside the
+    /// collection's and those they need, directly or through the mods those need.
+    /// </summary>
+    public const string CollectionOnTopic = "mods.collection_on";
 
     /// <summary>
     /// The topic that tells a mod's description: {"id", "fetch" => false to only read what is
@@ -201,6 +215,7 @@ internal sealed partial class ModsTopics
     private void RegisterBrowse(BridgeContext context)
     {
         context.Register(BrowseTopic, (_, request) => Browse(request.IsNil ? new RubyHash() : request.AsHash()));
+        context.Register(CollectionOnTopic, (_, request) => CollectionOn(request.AsHash()));
         context.Register(DescribeTopic, (_, request) => Describe(request.AsHash()));
         context.Register(RemoveTopic, (_, request) => Remove(request.AsHash()));
         context.Register(VoteTopic, (_, request) => Vote(request.AsHash()));
@@ -296,7 +311,7 @@ internal sealed partial class ModsTopics
             .ToList();
         var updates = rows.Where(row => row.Status == ModStatus.Update && !row.Row["by_hand"].AsBool()).OrderBy(row => row.Key.Item1, StringComparer.OrdinalIgnoreCase).Select(row => (RubyValue)row.Row);
 
-        return new RubyHash
+        var answer = new RubyHash
         {
             { "fetching", _fetch.Running },
             { "pictures", Pictures.Running },
@@ -310,6 +325,81 @@ internal sealed partial class ModsTopics
             { "updates", new RubyArray(updates) },
             { "collections", new RubyArray((collections ?? []).Where(collection => ModBrowse.Matches(string.Join('\n', collection.Name, collection.Author, collection.Summary), search)).Select(collection => (RubyValue)CollectionOf(collection, known, elsewhere, states, snapshot.Plan))) },
         };
+
+        if (TextOf(request, "find") is { } find)
+        {
+            answer.Add("found", FoundOf(find, known, elsewhere));
+        }
+
+        return answer;
+    }
+
+    /// <summary>
+    /// Finds the mod of the lists a name means, a website's mod without a package for the platform
+    /// the game runs on too.
+    /// </summary>
+    /// <param name="name">The mod's id, or a name a requirement names it by.</param>
+    /// <param name="known">Every mod of the lists.</param>
+    /// <param name="elsewhere">The website's mods without a package for the platform the game runs on.</param>
+    /// <returns>Its id; <see langword="null"/> for none.</returns>
+    private static string? FoundOf(string name, IReadOnlyList<BrowsedMod> known, IReadOnlyList<SiteMod> elsewhere)
+    {
+        if (ModUpdates.Named(known, name) is { } mod)
+        {
+            return mod.Id;
+        }
+
+        var key = ModRequirement.KeyOf(name);
+        var other = elsewhere.FirstOrDefault(each => SitePrefix + each.Slug == name || (key.Length > 0 && (ModRequirement.KeyOf(each.Slug) == key || ModRequirement.KeyOf(each.Name) == key)));
+        return other == null ? null : SitePrefix + other.Slug;
+    }
+
+    /// <summary>
+    /// Turns a collection on: its installed mods on, each tag's of them in its order, in one write.
+    /// </summary>
+    /// <param name="request">The collection's id, see <see cref="CollectionOnTopic"/>.</param>
+    /// <returns>The state after it, with the other mods that are on.</returns>
+    /// <exception cref="RubyValueException">A part of the request has another kind.</exception>
+    internal RubyHash CollectionOn(RubyHash request)
+    {
+        var id = TextOf(request, "id") ?? string.Empty;
+        var snapshot = Current();
+        var known = Known().Mods;
+        var collection = id.StartsWith(CollectionPrefix, StringComparison.Ordinal) ? Collections()?.FirstOrDefault(each => each.Slug == id[CollectionPrefix.Length..]) : null;
+        var members = (collection?.Mods ?? [])
+            .Where(entry => entry.Available)
+            .Select(entry => known.FirstOrDefault(mod => mod.Id == SitePrefix + entry.Slug))
+            .OfType<BrowsedMod>()
+            .Select(mod => InstalledOf(mod, snapshot.Plan))
+            .OfType<PlannedMod>()
+            .Distinct()
+            .ToList();
+        var lines = snapshot.Plan.Ini.ToList();
+        var refused = new RubyArray();
+
+        if (collection == null)
+        {
+            refused.Add(new RubyArray { id, "This collection is not in the lists." });
+        }
+
+        foreach (var member in members)
+        {
+            var index = lines.FindIndex(line => Same(line.Key, member.Mod.Name));
+            lines[index] = new(lines[index].Key, lines[index].Value with { On = true });
+        }
+
+        foreach (var tagged in members.GroupBy(member => member.Tag).Where(tagged => tagged.Count() > 1))
+        {
+            Reorder(lines, snapshot.Plan.Mods.ToList(), tagged.Select(member => member.Mod.Name).ToList(), refused);
+        }
+
+        var (state, plan) = Keep(snapshot, lines, refused);
+        var names = members.Select(member => member.Mod.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var needed = ModPlan.NeededClosure(plan.Mods.Where(planned => names.Contains(planned.Mod.Name)), plan.Mods);
+        var others = plan.Mods.Where(planned => planned.On && !names.Contains(planned.Mod.Name) && !needed.Contains(planned)).ToList();
+        Log.Write($"turned on {members.Count} mods of the collection {id} in its order; {others.Count} other mods are on");
+        state.Add("others", new RubyArray(others.Select(planned => (RubyValue)new RubyArray { planned.Mod.Name, planned.Mod.Title })));
+        return state;
     }
 
     /// <summary>
@@ -509,6 +599,7 @@ internal sealed partial class ModsTopics
             { "summary", mod.Summary },
             { "tag", installed?.Tag ?? (mod.Tag.Length > 0 ? mod.Tag : ModTag.Regular) },
             { "by_hand", mod.ByHand },
+            { "brings", BringsOf(mod, plan, known) },
             { "status", state.Status },
             { "installed", state.Installed?.Version },
             { "place", installed?.Mod.Place ?? (state.Installed != null ? PatchFolder.Name : string.Empty) },
@@ -599,6 +690,7 @@ internal sealed partial class ModsTopics
             { "summary", mod.Summary },
             { "tag", mod.Tag.Length > 0 ? mod.Tag : ModTag.Regular },
             { "by_hand", ModTag.ByHand(mod.Tag) },
+            { "brings", new RubyArray() },
             { "status", ModStatus.OtherPlatform },
             { "installed", RubyNil.Value },
             { "place", string.Empty },
@@ -654,6 +746,41 @@ internal sealed partial class ModsTopics
         }
 
         return rows;
+    }
+
+    /// <summary>
+    /// Lists the mods of the lists an install of a mod also needs: each requirement of its latest
+    /// version no other installed mod meets, and those of their latest versions in turn.
+    /// </summary>
+    /// <param name="mod">The mod.</param>
+    /// <param name="plan">The plan of the installed mods.</param>
+    /// <param name="known">Every mod of the lists, which a missing requirement is found among.</param>
+    /// <returns>Their ids, each once, the mod's own needs first.</returns>
+    private static RubyArray BringsOf(BrowsedMod mod, PlanResult plan, IReadOnlyList<BrowsedMod> known)
+    {
+        var brought = new List<BrowsedMod>();
+        var waiting = new Queue<BrowsedMod>([mod]);
+
+        while (waiting.TryDequeue(out var needing))
+        {
+            foreach (var requirement in needing.Known[0].Requires ?? [])
+            {
+                var key = ModRequirement.KeyOf(requirement.Name);
+
+                if (key == ModRequirement.KeyOf(ModPlan.FrameworkName) || plan.Mods.Any(planned => planned.Mod.Known?.Id != needing.Id && planned.Mod.Keys.Contains(key)))
+                {
+                    continue;
+                }
+
+                if (known.FirstOrDefault(other => other != needing && KeysOf(other).Contains(key)) is { } source && source != mod && !brought.Contains(source))
+                {
+                    brought.Add(source);
+                    waiting.Enqueue(source);
+                }
+            }
+        }
+
+        return new RubyArray(brought.Select(each => (RubyValue)each.Id));
     }
 
     /// <summary>

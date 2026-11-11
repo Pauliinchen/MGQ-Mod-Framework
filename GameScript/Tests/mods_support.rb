@@ -2,6 +2,7 @@
 #  mods_support.rb
 #
 #  Changelog:
+#      Paulinchen  2026-11-11: Answered the turn of a collection on and a mod found by a name, and gave each mod the needs its install brings
 #      Paulinchen  2026-11-07: Removed the answer of the update through the helper
 #                            - Took in the last request of a topic from the browser's test
 #                            - Took a Title mod of no name as the example
@@ -62,7 +63,7 @@ def browsed_mod(slug, name, status, options = {})
   { "id" => "site:#{slug}", "name" => name, "author" => "Someone", "source" => "site", "page" => true, "summary" => "#{name} does a thing.", "tag" => "Regular",
     "status" => status, "installed" => installed, "place" => status == "available" ? "" : "Patch", "folder" => name.tr(" ", "_"),
     "on" => status == "available" ? nil : true, "latest" => status == "update" ? "1.1" : "1.0", "bytes" => 2048, "files" => 2, "notes" => ["- Fixed a thing"],
-    "picture" => "Patch/Mod_Framework/Cache/Thumbnails/#{slug}.png", "spoiler" => false, "picture_waits" => false, "framework" => false, "needs" => [] }.merge(options)
+    "picture" => "Patch/Mod_Framework/Cache/Thumbnails/#{slug}.png", "spoiler" => false, "picture_waits" => false, "framework" => false, "needs" => [], "brings" => [] }.merge(options)
 end
 
 # What the mod browser shows: an update, an installed mod, two not installed (one needing the
@@ -73,7 +74,7 @@ def fresh_browsed
   { "fetching" => false, "pictures" => false, "site" => true, "collections_kept" => true,
     "mods" => [browsed_mod("level-cap", "Level Cap", "update", "tag" => "Title"),
                browsed_mod("invasions", "Invasions", "current", "spoiler" => true),
-               browsed_mod("map-display", "Map Display", "available", "needs" => [["Party Sheet", "", "missing", "", "", "site:party-sheet"]]),
+               browsed_mod("map-display", "Map Display", "available", "needs" => [["Party Sheet", "", "missing", "", "", "site:party-sheet"]], "brings" => ["site:party-sheet"]),
                browsed_mod("party-sheet", "Party Sheet", "available", "picture" => nil)],
     "collections" => [{ "slug" => "story-plus", "id" => "collection:story-plus", "name" => "Story Plus", "summary" => "A second run.", "author" => "Someone", "page" => true,
                         "mods" => [{ "slug" => "invasions", "id" => "site:invasions", "name" => "Invasions", "version" => "1.0", "available" => true, "status" => "current", "installed" => "1.0", "folder" => "Invasions", "on" => false },
@@ -115,7 +116,17 @@ def with_mods_topics(fake)
     state.call("written" => true, "refused" => [])
   end
   fake.answer("mods.restart") { |request| $requests << ["mods.restart", request]; { "started" => true, "refused" => nil } }
-  fake.answer("mods.browse") { |request| $requests << ["mods.browse", request] if request; $browsed || fresh_browsed }
+  fake.answer("mods.browse") do |request|
+    $requests << ["mods.browse", request] if request
+    answer = $browsed || fresh_browsed
+    next answer unless request && request["find"]
+
+    answer.merge("found" => (answer["mods"].find { |mod| mod["id"] == request["find"] } || {})["id"])
+  end
+  fake.answer("mods.collection_on") do |request|
+    $requests << ["mods.collection_on", request]
+    state.call("written" => true, "refused" => [], "others" => $collection_others || [])
+  end
   fake.answer("mods.describe") { |request| { "lines" => ["Caps the levels of the party."], "fetching" => false } }
   fake.answer("mods.install") { |request| $requests << ["mods.install", request]; { "started" => true, "refused" => nil } }
   fake.answer("mods.remove") { |request| $requests << ["mods.remove", request]; { "removed" => ["Level Cap"], "refused" => nil } }

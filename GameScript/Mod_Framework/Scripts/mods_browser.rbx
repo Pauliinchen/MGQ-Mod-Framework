@@ -2,6 +2,8 @@
 #  mods_browser.rbx
 #
 #  Changelog:
+#      Paulinchen  2026-11-11: Left turning a collection on, the mods it keeps on, the needs an install brings and finding a mod by
+#                              a name to the DLL
 #      Paulinchen  2026-11-09: Said on the bar when an upvote could not start
 #      Paulinchen  2026-11-08: Left the mods installed by hand out of Update all, a collection's install and the install of a mod's needs, and named them on the bar and in the log
 #      Paulinchen  2026-11-07: Highlighted the text searched for in the names on the cards
@@ -52,6 +54,9 @@ module Mod_Framework
     # The topic that lists what the mod browser shows.
     BROWSE_TOPIC = "mods.browse"
 
+    # The topic that turns a collection on.
+    COLLECTION_ON_TOPIC = "mods.collection_on"
+
     # The topic that tells a mod's description.
     DESCRIBE_TOPIC = "mods.describe"
 
@@ -82,17 +87,28 @@ module Mod_Framework
     #
     # @param fetch [Boolean] Whether to fetch the lists again first; the answer comes from the
     #   cache at once, and mods.fetched tells once the fetch ended.
-    # @param query [Hash, nil] {"order", "search", "picks"}, see ModsTopics.BrowseTopic; nil for
-    #   every mod by name.
+    # @param query [Hash, nil] {"order", "search", "picks", "find"}, see ModsTopics.BrowseTopic;
+    #   nil for every mod by name.
     # @return [Hash, nil] {"fetching", "pictures", "site", "collections_kept", "total",
-    #   "collections_total", "picks", "filters", "mods", "updates", "collections"}; nil without the
-    #   DLL.
+    #   "collections_total", "picks", "filters", "mods", "updates", "collections"}, and "found" for
+    #   a "find"; nil without the DLL.
     def self.browsed(fetch = false, query = nil)
       return nil unless Mod_Framework.available?
 
       request = query ? query.dup : {}
       request["fetch"] = true if fetch
       Mod_Framework.bridge.call(BROWSE_TOPIC, request.empty? ? nil : request)
+    end
+
+    # Turns a collection on: its installed mods on, each tag's of them in its order, in one write
+    # of Mods.ini, see ModsTopics.CollectionOnTopic.
+    #
+    # @param id [String] The collection's id, such as "collection:story-plus".
+    # @return [Hash, nil] The state after it, see set, with "others" => [[name, title], ...]: the
+    #   mods that are on beside the collection's and those they need; nil without the DLL.
+    def self.collection_on(id)
+      @on_names = nil
+      Mod_Framework.available? ? Mod_Framework.bridge.call(COLLECTION_ON_TOPIC, "id" => id) : nil
     end
 
     # Tells which game runs, as the website's "works with" names it, by the words of the title's
@@ -1239,7 +1255,7 @@ module Mod_Framework
       # @param mod [Hash] The mod.
       # @param off [Boolean] Whether it is installed turned off.
       def install_with_needs(mod, off)
-        needed = every_mod(Array(mod["needs"]).select { |need| need[2] == "missing" && need[5] }.map { |need| need[5] })
+        needed = every_mod(Array(mod["brings"]))
         missing = needed.reject { |other| other["by_hand"] }
         note = by_hand_note(needed - missing, mod["id"])
         kind = mod["status"] == UPDATE ? :updated_to : :installed
@@ -1281,37 +1297,13 @@ module Mod_Framework
       # @param key [String] The mod's id, or a name a requirement names it by.
       # @return [String, nil] The mod's id, nil for none.
       def found_mod(key)
-        found = find_mod(key, mods)
-        return found if found
-
-        every = Mods.browsed(false, "order" => Browser.order, "picks" => { "platform" => "any" })
-        found = find_mod(key, every.is_a?(Hash) ? Array(every["mods"]) : [])
-        return nil unless found
+        answer = Mods.browsed(false, "find" => key.to_s)
+        found = answer.is_a?(Hash) ? answer["found"] : nil
+        return found if found.nil? || mod_by_id(found)
 
         Browser.clear_picks
         self.search = ""
         found
-      end
-
-      # Finds a mod by its id, else by a name a requirement names it by, as ModRequirement.KeyOf
-      # matches them.
-      #
-      # @param key [String] The id or the name.
-      # @param listed [Array<Hash>] The mods to look among.
-      # @return [String, nil] The mod's id, nil for none.
-      def find_mod(key, listed)
-        wanted = key_of(key)
-        found = listed.find { |mod| mod["id"] == key.to_s }
-        found ||= listed.find { |mod| [mod["name"], mod["folder"], mod["id"].to_s.split(":", 2).last].any? { |name| key_of(name) == wanted } }
-        found && found["id"]
-      end
-
-      # Makes the key mods' names are matched by.
-      #
-      # @param name [String, nil] A name, folder or slug.
-      # @return [String] It in lower case without ".rb", spaces, underscores and hyphens.
-      def key_of(name)
-        name.to_s.sub(/\.rb\z/i, "").delete(" _-").downcase
       end
 
       # Finds mods by their ids among every mod the lists have, whatever the picks of the filters
@@ -1542,46 +1534,29 @@ module Mod_Framework
       # @param collection [Hash] The collection, as it was before the install.
       # @param error [String, nil] What went wrong in the install, said instead of the done line.
       def turn_on_collection(collection, error = nil)
-        folders = keep_collection_on(collection)
+        others = keep_collection_on(collection)
         installed = Array(collection["mods"]).any? { |entry| BrowserCollectionPage.installs?(entry) }
         Sound.play_ok unless error
         say(error || (installed ? TEXTS[:collection_done] : TEXTS[:collection_on]), error ? :error : nil)
-        ask_others(folders)
+        ask_others(others)
       end
 
-      # Turns a collection's mods on in Mods.ini in its order.
+      # Turns a collection's installed mods on in Mods.ini in its order.
       #
-      # @param collection [Hash] The collection, as it was before the install.
-      # @return [Array<String>] The names of its mods.
+      # @param collection [Hash] The collection.
+      # @return [Array<Hash>] The other mods that are on, each {"name", "title"}: neither the
+      #   collection's nor needed by them.
       def keep_collection_on(collection)
-        current = collections.find { |each| each["id"] == collection["id"] } || collection
-        folders = Array(current["mods"]).select { |entry| entry["available"] && entry["status"] != AVAILABLE }.map { |entry| entry["folder"] }.compact
-        turn_on(folders)
-        order_like(folders)
+        answer = Mods.collection_on(collection["id"])
+        Mods.log("turning on the collection #{collection['id']} was not kept: #{answer.inspect}") unless answer.is_a?(Hash) && answer["written"]
         Browser.bump
-        folders
+        Array(answer.is_a?(Hash) ? answer["others"] : nil).map { |name, title| { "name" => name, "title" => title } }
       end
 
-      # Puts mods of each tag in the order given, in the places they hold now.
+      # Asks whether to turn off the mods that are on beside a collection's and those they need.
       #
-      # @param folders [Array<String>] The mods' names in their order.
-      def order_like(folders)
-        managed = Array((Mods.state || {})["mods"]).select { |mod| mod["tag"] && folders.include?(mod["name"]) }
-        managed.group_by { |mod| mod["tag"] }.each_value do |members|
-          next if members.size < 2
-
-          Mods.set("order" => members.map { |mod| mod["name"] }.sort_by { |name| folders.index(name) })
-        end
-      end
-
-      # Asks whether to turn off the mods that are on and lie outside a collection, but those its
-      # mods need, which never leave a requirement off.
-      #
-      # @param folders [Array<String>] The names of the collection's mods.
-      def ask_others(folders)
-        mods_now = Array((Mods.state || {})["mods"])
-        needed = mods_now.select { |mod| folders.include?(mod["name"]) }.map { |mod| Array(mod["needs"]).map { |need| need[4] } }.flatten.compact
-        others = mods_now.select { |mod| mod["tag"] && mod["on"] && !folders.include?(mod["name"]) && !needed.include?(mod["name"]) }
+      # @param others [Array<Hash>] The mods, each {"name", "title"}, see keep_collection_on.
+      def ask_others(others)
         return if others.empty?
 
         names = others.map { |mod| mod["title"] }
@@ -1603,7 +1578,7 @@ module Mod_Framework
 
       # Asks whether to start the game again now for running mods a collection turned off.
       #
-      # @param turned_off [Array<Hash>] The mods, as Mods.state tells them.
+      # @param turned_off [Array<Hash>] The mods, each {"name", "title"}.
       def ask_restart_turned_off(turned_off)
         turned_off.each { |mod| Mods.wait_for_restart([:browser, mod["name"]], format(TEXTS[:runs_until], mod["title"])) }
         what = UI.listed(turned_off.map { |mod| mod["title"] }, "is turned off", "are turned off")

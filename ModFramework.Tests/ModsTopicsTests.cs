@@ -2,6 +2,8 @@
 //  ModsTopicsTests.cs
 //
 //  Changelog:
+//      Paulinchen  2026-11-11: Covered a collection turned on with the mods its mods need in turn, the needs an install brings and a mod
+//                              found by a name the picks hide
 //      Paulinchen  2026-11-09: Ran the work in a start that tells whether it started
 //      Paulinchen  2026-11-08: Covered a Data mod, which the player installs and updates by hand only
 //      Paulinchen  2026-11-07: Covered the update of a mod that runs, which waits for the next start
@@ -539,6 +541,65 @@ public void Needs_ListsWhatInstallsTurnsOnOrComesFromItsAuthor()
         Assert.Equal([[ModCheck.ByHand, "Level_Cap", "Level Cap", "1.5.0", "1.6.0", "site:level-cap"]], Rows(Saved(["Level_Cap", "1.5.0", ModTag.Data])));
         Assert.Equal((ModCheck.ByHand, "site:level-cap"), (needed["rows"].AsArray()[0].AsHash()["kind"].AsText(), needed["rows"].AsArray()[0].AsHash()["target"].AsText()));
     }
+
+    /// <summary>
+    /// Asserts that turning a collection on turns its installed mods on in its order in one change
+    /// of Mods.ini and names as the other mods that are on only those neither it nor the mods it
+    /// needs in turn need; that a mod not installed brings the website's mods it needs and those they
+    /// need, but none installed; and that a name finds its mod while the picks hide it.
+    /// </summary>
+    [Fact]
+    public void CollectionOn_KeepsTheModsItNeedsInTurn()
+    {
+        foreach (var name in new[] { "Alpha", "Beta", "Cee", "Wide_View", "Xeno" })
+        {
+            _game.Put($"Patch/{name}.rb", ScriptOf(name));
+        }
+
+        ModCache.StoreSite(_game.Path, Encoding.UTF8.GetBytes($$"""
+            {"schema":2,"mods":[{{Needing("xeno", "Xeno", "alpha")}},{{Needing("alpha", "Alpha", "beta")}},{{Needing("beta", "Beta")}},{{Needing("cee", "Cee")}},{{Needing("wide-view", "Wide_View")}},
+             {{Needing("gamma", "Gamma", "delta")}},{{Needing("delta", "Delta", "epsilon", "beta")}},{{Needing("epsilon", "Epsilon")}}]}
+            """));
+        ModCache.StoreCollections(_game.Path, Encoding.UTF8.GetBytes("""
+            {"schema":2,"collections":[{"slug":"pack","name":"Pack","summary":"","author":"Someone","page":null,"mods":[{"slug":"xeno","version":null,"available":true},{"slug":"wide-view","version":null,"available":true}]}]}
+            """));
+        _ui.Value(ModsTopics.SetTopic, new RubyHash { { "on", new RubyHash { { "Xeno", false }, { "Wide_View", false } } } });
+
+        var on = _ui.Value(ModsTopics.CollectionOnTopic, new RubyHash { { "id", "collection:pack" } }).AsHash();
+        var hidden = _ui.Value(ModsTopics.BrowseTopic, new RubyHash { { "picks", new RubyHash { { "categories", new RubyArray { "visual" } } } }, { "find", "wide view" } }).AsHash();
+        var gamma = _ui.Value(ModsTopics.BrowseTopic).AsHash()["mods"].AsArray().Select(mod => mod.AsHash()).First(mod => mod["id"].AsText() == "site:gamma");
+
+        Assert.Equal(RubyBool.True, on["written"]);
+        Assert.Equal("Beta=on Regular\nAlpha=on Regular\nCee=on Regular\nLevel_Cap=on Regular\nOwn=on Regular\nXeno=on Regular\nWide_View=on Regular\nZed=on Regular\n", IniText());
+        Assert.Equal(new RubyArray { new RubyArray { "Cee", "Cee" }, new RubyArray { "Level_Cap", "Level_Cap" }, new RubyArray { "Own", "Own" }, new RubyArray { "Zed", "Zed" } }, on["others"]);
+        Assert.Equal(new RubyArray { "site:delta", "site:epsilon" }, gamma["brings"]);
+        Assert.Equal((0, "site:wide-view"), (hidden["mods"].AsArray().Count, hidden["found"].AsText()));
+    }
+
+    /// <summary>
+    /// Writes a mod of schema 2 of the website's list with one version, whose script is
+    /// <see cref="ScriptOf"/> its name.
+    /// </summary>
+    /// <param name="slug">Its slug.</param>
+    /// <param name="name">Its name, which its script takes.</param>
+    /// <param name="requires">The slugs of the mods it needs.</param>
+    /// <returns>The mod as JSON.</returns>
+    private static string Needing(string slug, string name, params string[] requires)
+    {
+        var hash = ModMergeTests.Raw(ScriptOf(name));
+        var needs = string.Join(',', requires.Select(need => $$"""{"slug":"{{need}}","minVersion":""}"""));
+        return $$"""
+            {"slug":"{{slug}}","name":"{{name}}","author":"Someone","tag":"Regular","versions":[{"version":"1.0","changelog":"","uploadedAt":"2026-10-20T10:00:00+00:00",
+             "package":{"name":"{{name}}.rb","size":1,"sha256":"{{hash}}","url":"https://mgqonline.org/mods/{{slug}}/1/download"},"files":[{"path":"{{name}}.rb","sha256":"{{hash}}"}],"requires":[{{needs}}]}]}
+            """;
+    }
+
+    /// <summary>
+    /// Makes the script of a mod of <see cref="Needing"/>.
+    /// </summary>
+    /// <param name="name">The mod's name.</param>
+    /// <returns>Its bytes.</returns>
+    private static byte[] ScriptOf(string name) => Encoding.UTF8.GetBytes($"# {name}\n");
 
     /// <summary>
     /// Keeps a website list in the cache whose Level Cap has a version newer than the one installed,

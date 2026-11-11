@@ -2,6 +2,7 @@
 //  ModPlan.cs
 //
 //  Changelog:
+//      Paulinchen  2026-11-11: Told the installed mods some mods need through the mods those need in turn
 //      Paulinchen  2026-11-07: Used the bridge and the runtime under the framework's namespace
 //      Paulinchen  2026-11-06: Removed the relay's catalog and the GitHub releases as sources of mods; the website is the only one
 //      Paulinchen  2026-11-01: Took a mod's tag only from its authors, never from the player
@@ -141,6 +142,32 @@ internal static class ModPlan
         mods.Where(other => other != mod && other.On && other.Mod.Requires.Any(requirement => Provider(other, requirement, mods) == mod))
             .Select(other => other.Mod.Title)
             .ToList();
+
+    /// <summary>
+    /// Lists the installed mods some mods need, directly or through the mods those need in turn.
+    /// </summary>
+    /// <param name="roots">The mods whose needs count.</param>
+    /// <param name="mods">Every planned mod.</param>
+    /// <returns>The mods that meet those needs, on or off, each once.</returns>
+    public static List<PlannedMod> NeededClosure(IEnumerable<PlannedMod> roots, IReadOnlyList<PlannedMod> mods)
+    {
+        var needed = new List<PlannedMod>();
+        var waiting = new Queue<PlannedMod>(roots);
+
+        while (waiting.TryDequeue(out var mod))
+        {
+            foreach (var requirement in mod.Mod.Requires)
+            {
+                if (Provider(mod, requirement, mods) is { } provider && !needed.Contains(provider))
+                {
+                    needed.Add(provider);
+                    waiting.Enqueue(provider);
+                }
+            }
+        }
+
+        return needed;
+    }
 
     /// <summary>
     /// Finds the installed mod that meets a requirement.

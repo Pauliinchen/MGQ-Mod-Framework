@@ -2,6 +2,7 @@
 #  mods_browser_test.rb
 #
 #  Changelog:
+#      Paulinchen  2026-11-11: Had the DLL turn the collection on and tell the other mods that are on and the needs an install brings
 #      Paulinchen  2026-11-08: Covered a Data mod, whose page has no Install and which a collection's install leaves out
 #      Paulinchen  2026-11-07: Checked that the framework's update installs and then starts the game again
 #                            - Greyed rows and choices with disabled:
@@ -296,6 +297,7 @@ in_game_folder do
   tree = FakeTree.new
   $mods = fresh_mods
   $browsed = fresh_browsed
+  $collection_others = $mods.select { |mod| mod["on"] }.map { |mod| [mod["name"], mod["title"]] }
   $asked = 0
   boot_tree(with_mods_topics(tree_dll(tree)), :game => lambda { define_mods_game }) do
     mods = Mod_Framework::Mods
@@ -314,7 +316,8 @@ in_game_folder do
     $browsed["collections"][0]["mods"][1].merge!("status" => "current", "installed" => "1.0", "on" => true)
     $dll.post("mods.installed", "installed" => ["Party_Sheet"], "mod" => nil, "error" => nil, "moved" => [])
     frame
-    check("then asks whether to turn the other mods off", question, "6 other mods are on: Core Lib, Online Arena and 4 more. Turn them off so only this collection's mods run?")
+    check("then has the DLL turn the collection on and asks whether to turn off the other mods it names",
+          [last_request("mods.collection_on"), question], [{ "id" => "collection:story-plus" }, "6 other mods are on: Core Lib, Online Arena and 4 more. Turn them off so only this collection's mods run?"])
     answer(false)
     tell(tree, [[page_window.find(:mf_browser_entries).node, "submit", 1]])
     check("one of its mods opens that mod's page on the Mods tab", [browser.shown_tab, page_item], [mods::ModBrowser::MODS_TAB, "site:party-sheet"])
@@ -362,7 +365,7 @@ in_game_folder do
               "known_issues" => ["Flickers on the world map."], "options" => [["[Map Display] Size", "How big."]], "hotkeys" => [["[Map Display] Open", "F7"]],
               "works_with" => ["english"], "languages" => ["English"], "categories" => ["Quality of Life"], "keywords" => ["map"], "credits" => [["Ann", "Art"]],
               "license" => ["MIT", "no", "with-credit"], "links" => [["source", "https://github.com/someone/map-display"]] }
-  $browsed["mods"].find { |mod| mod["name"] == "Map Display" }.merge!("details" => details, "needs" => [], "source" => "site")
+  $browsed["mods"].find { |mod| mod["name"] == "Map Display" }.merge!("details" => details, "needs" => [], "brings" => [], "source" => "site")
   $asked = 0
   russian = lambda do
     define_mods_game
@@ -397,7 +400,7 @@ in_game_folder do
   $mods = fresh_mods
   $browsed = fresh_browsed
   $browsed["mods"] << browsed_mod("bigger-shops", "Bigger Shops", "available", "tag" => "Data", "by_hand" => true)
-  $browsed["mods"].find { |mod| mod["name"] == "Map Display" }["needs"] = [["Bigger Shops", "", "missing", "", "", "site:bigger-shops"]]
+  $browsed["mods"].find { |mod| mod["name"] == "Map Display" }.merge!("needs" => [["Bigger Shops", "", "missing", "", "", "site:bigger-shops"]], "brings" => ["site:bigger-shops"])
   $browsed["collections"][0]["mods"] << { "slug" => "bigger-shops", "id" => "site:bigger-shops", "name" => "Bigger Shops", "version" => "1.0", "available" => true,
                                           "by_hand" => true, "status" => "available", "installed" => nil, "folder" => "Bigger_Shops", "on" => nil }
   $asked = 0
