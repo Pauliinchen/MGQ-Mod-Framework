@@ -2,6 +2,7 @@
 //  ModsTopics.cs
 //
 //  Changelog:
+//      Paulinchen  2026-11-12: Started the game again with the engine's options the running game was started with
 //      Paulinchen  2026-11-11: Took whether a mod has an update from how its files stand
 //                            - Planned and wrote changed lines of Mods.ini in one place for every change of the player
 //      Paulinchen  2026-11-07: Started the game again from the game, without the helper
@@ -224,7 +225,7 @@ internal sealed partial class ModsTopics
     /// </summary>
     /// <param name="context">The context the handshake opened.</param>
     public static void Register(BridgeContext context) =>
-        new ModsTopics(ModFolder.GameRoot, ModFetch.Live, FrameworkBridge.Build, action => GameRestart.StartAgain(GameRestart.GameExeOf(ModFolder.GameRoot), action), ModInstall.Live, OpenInBrowser)
+        new ModsTopics(ModFolder.GameRoot, ModFetch.Live, FrameworkBridge.Build, action => GameRestart.StartAgain(GameRestart.GameExeOf(ModFolder.GameRoot), GameRestart.LiveOptions(), action), ModInstall.Live, OpenInBrowser)
             .RegisterOn(context);
 
     /// <summary>

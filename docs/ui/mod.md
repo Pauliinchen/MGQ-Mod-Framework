@@ -92,8 +92,8 @@ end
 
 Nothing takes a loaded mod out of the game, so once a Default mod loaded, every way back to the
 title (To Title, a game over, F12) starts the game again: right before the game closes, the
-framework starts the game's own Game.exe once more. On JoiPlay the game closes and the player
-starts it. A mod can start the game again itself and carry one action to the title of the game
+framework starts the game's own Game.exe once more, with the engine's options it was started
+with (`test`, `btest`, `console`). On JoiPlay the game closes and the player starts it. A mod can start the game again itself and carry one action to the title of the game
 that starts:
 
 ```ruby

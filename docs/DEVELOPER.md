@@ -28,7 +28,7 @@ Patch/Mod_Framework/Scripts/   *.rbx
 Patch/Mod_Framework/Graphics/  *.png
 ```
 
-- **The framework ships no program.** The game starts again by starting its own `Game.exe`, and the stub moves the waiting updates into place as it starts (see [The boot and the copies](#the-boot-and-the-copies)). A game that cannot start gets the framework from the website again by hand.
+- **The framework ships no program.** The game starts again by starting its own `Game.exe` with only the engine's options it got (`test`, `btest`, `console`): a launcher's link on the command line would act again on every restart. The stub moves the waiting updates into place as it starts (see [The boot and the copies](#the-boot-and-the-copies)). A game that cannot start gets the framework from the website again by hand.
 - **No other mod's zip carries the framework.** Players install it on their own, from the website or the release zip; the stub still looks for copies inside mod folders.
 - **The zip brings the Equipment Window's first copy.** `Patch/Equipment_Window.rb`, the Mod Collection's latest released copy put in `Bundled/`, is the website's mod `equipment-window`, which owns its updates. `Manifest.txt` leaves it out, and the framework's package (slug `mod-framework`) owns only `!Mod_Framework.rb` and `Mod_Framework/` (`ModMerge.FilesOf`), so the framework's update never touches the file and the browser updates and removes it like any mod. **Trap:** each release's copy must be a version the website lists, or the browser shows it as a changed copy: it asks whether to lose that copy before an update and cannot remove it.
 

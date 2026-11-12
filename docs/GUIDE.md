@@ -93,7 +93,7 @@ The framework looks for updates of itself and of your mods as the game starts an
 - An update of the framework, or of a mod that runs already, downloads into `Patch\Mod_Framework\Waiting` and takes its place as the game starts again. The framework's own update asks first, then starts the game again for you; for a mod, *Restart now* does, or the next start.
 - A mod may need another mod at a newer version, such as an online mod whose server asks for its latest release. The game then names the update, and *Update and restart* installs it and starts the game again.
 - Once mods loaded as you started or loaded a game, going back to the title (*To Title*, a game over, F12) starts the game again, so you return to a title without them.
-- The game starts again by starting its own `Game.exe` once more. This is checked on Windows; on Linux with Wine or Proton it should work too but is not checked yet, see [Platforms](#platforms). On JoiPlay it closes instead: start it again yourself.
+- The game starts again by starting its own `Game.exe` once more, with the options it was started with, such as `console` or `test`. This is checked on Windows; on Linux with Wine or Proton it should work too but is not checked yet, see [Platforms](#platforms). On JoiPlay it closes instead: start it again yourself.
 
 **If the game cannot start** after an update, download the framework again from [mgqonline.org/mods](https://mgqonline.org/mods) and extract it into the game folder. The website keeps every version, so you can also take the version before the one that does not start.
 

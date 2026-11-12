@@ -2,6 +2,7 @@
 //  GameRestartTests.cs
 //
 //  Changelog:
+//      Paulinchen  2026-11-12: Covered the engine's options passed on to the game that starts again
 //      Paulinchen  2026-11-07: Started the game again without the helper
 //                            - Dropped the update through the helper
 //                            - Read the helper lines in the framework log
@@ -28,7 +29,7 @@ namespace MGQParadox.ModFramework.Tests.Mods;
 
 /// <summary>
 /// Covers the start of the game again: refused without its program or with a bad action, and the
-/// game's program started with the action in its environment.
+/// game's program started with the engine's options it got and the action in its environment.
 /// </summary>
 public sealed class GameRestartTests : IDisposable
 {
@@ -50,11 +51,11 @@ public sealed class GameRestartTests : IDisposable
     [Fact]
     public void Restart_IsRefusedWithoutItsProgramOrWithABadAction()
     {
-        Assert.False(GameRestart.StartAgain(GameExe, null));
+        Assert.False(GameRestart.StartAgain(GameExe, string.Empty, null));
 
         File.WriteAllText(GameExe, string.Empty);
         Environment.SetEnvironmentVariable(GameRestart.ActionVariable, "old");
-        Assert.False(GameRestart.StartAgain(GameExe, "load:3"));
+        Assert.False(GameRestart.StartAgain(GameExe, string.Empty, "load:3"));
         Assert.Null(Environment.GetEnvironmentVariable(GameRestart.ActionVariable));
 
         Assert.Null(GameRestart.ActionText("load", "01", out var load));
@@ -68,18 +69,50 @@ public sealed class GameRestartTests : IDisposable
     }
 
     /// <summary>
-    /// Asserts that the restart starts the game's program and leaves the action in the environment
-    /// it hands the program.
+    /// Asserts that a game started from a shortcut with the engine's options and a launcher's link
+    /// passes on only the options, and that the restart starts the game's program in its folder with
+    /// the options and the action.
     /// </summary>
     [Fact]
-    public void Restart_StartsTheGameWithTheAction()
+    public void Restart_StartsTheGameWithItsOptionsAndTheAction()
     {
-        // ping stands in for the game: without arguments it ends at once.
-        File.Copy(Path.Combine(Environment.SystemDirectory, "PING.EXE"), GameExe);
+        Assert.Equal("test console", GameRestart.EngineOptionsOf("\"C:\\Games\\MGQ Paradox\\Game.exe\" test console"));
+        Assert.Equal("Console test", GameRestart.EngineOptionsOf("\"C:\\Games\\MGQ Paradox\\Game.exe\" \"discord-123://join?secret=x\" Console test"));
+        Assert.Equal(string.Empty, GameRestart.EngineOptionsOf("\"C:\\Games\\MGQ Paradox\\Game.exe\""));
 
-        Assert.True(GameRestart.StartAgain(GameExe, "load:3"));
-        Assert.Equal("load:3", Environment.GetEnvironmentVariable(GameRestart.ActionVariable));
+        // cmd stands in for the game and writes what it got into its working folder.
+        File.Copy(Path.Combine(Environment.SystemDirectory, "cmd.exe"), GameExe);
+        var started = Path.Combine(_game, "started.txt");
+
+        Assert.True(GameRestart.StartAgain(GameExe, "/d /c \"echo %MOD_FRAMEWORK_AFTER_RESTART% test console>started.txt\"", "load:3"));
         Environment.SetEnvironmentVariable(GameRestart.ActionVariable, null);
+
+        for (var attempt = 0; attempt < 100 && !File.Exists(started); attempt++)
+        {
+            Thread.Sleep(100);
+        }
+
+        Assert.Equal("load:3 test console", ReadWhenWritten(started));
+    }
+
+    /// <summary>
+    /// Reads a file another process may still be writing.
+    /// </summary>
+    /// <param name="path">The file.</param>
+    /// <returns>Its text without the line break at its end.</returns>
+    private static string ReadWhenWritten(string path)
+    {
+        for (var attempt = 0; ; attempt++)
+        {
+            try
+            {
+                return File.ReadAllText(path).TrimEnd();
+            }
+            catch (IOException) when (attempt < 50)
+            {
+                Thread.Sleep(100);
+            }
+        }
     }
 
     /// <inheritdoc />
