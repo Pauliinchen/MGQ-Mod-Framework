@@ -2,6 +2,7 @@
 //  SiteVotes.cs
 //
 //  Changelog:
+//      Paulinchen  2026-11-12: Gave up on an answer once the website stays silent as long as the client waits for one
 //      Paulinchen  2026-11-07: Used the bridge and the runtime under the framework's namespace
 //      Paulinchen  2026-11-06: Asked the website MGQ_MODS_SITE names for the votes when it is set
 //      Paulinchen  2026-11-01: Upvoted only, and read an earlier vote down as none
@@ -17,7 +18,6 @@ using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
-using System.Threading.Tasks;
 using MGQParadox.ModFramework.Runtime;
 
 namespace MGQParadox.ModFramework.Mods;
@@ -169,7 +169,7 @@ internal static class SiteVotes
             using (request)
             using (var response = http.Send(request, HttpCompletionOption.ResponseHeadersRead))
             {
-                var body = response.Content.Headers.ContentLength > MaxBytes ? [] : response.Content.ReadAsByteArrayAsync().GetAwaiter().GetResult();
+                var body = SiteFeed.ReadBody(response, MaxBytes, http) ?? [];
                 Log.Write($"website {request.Method} {request.RequestUri!.AbsolutePath}: {(int)response.StatusCode}");
 
                 if (response.StatusCode is HttpStatusCode.OK or HttpStatusCode.NoContent)
@@ -182,7 +182,7 @@ internal static class SiteVotes
                 throw new SiteVoteException(error);
             }
         }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException)
+        catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException or IOException)
         {
             Log.Write($"{what} could not reach the website: {ex.GetBaseException().Message}");
             throw new SiteVoteException(Unreachable);

@@ -2,6 +2,7 @@
 //  SiteFeed.cs
 //
 //  Changelog:
+//      Paulinchen  2026-11-12: Gave up on an answer once the website stays silent as long as the client waits for one
 //      Paulinchen  2026-11-11: Asked the website for every live version of each mod
 //      Paulinchen  2026-11-07: Used the bridge and the runtime under the framework's namespace
 //      Paulinchen  2026-11-06: Took the website's address from MGQ_MODS_SITE when it is set
@@ -27,7 +28,7 @@ using System.Linq;
 using System.Net;
 using System.Net.Http;
 using System.Text.Json;
-using System.Threading.Tasks;
+using System.Threading;
 using MGQParadox.ModFramework.Runtime;
 
 namespace MGQParadox.ModFramework.Mods;
@@ -168,19 +169,56 @@ internal static class SiteFeed
                 throw new SiteFeedException(Unreachable);
             }
 
-            if (response.Content.Headers.ContentLength > MaxBytes)
+            if (ReadBody(response, MaxBytes, http) is not { } body)
             {
                 Log.Write($"the website's {what} is larger than {MaxBytes} bytes");
                 throw new SiteFeedException(Unreadable);
             }
 
-            return response.Content.ReadAsByteArrayAsync().GetAwaiter().GetResult();
+            return body;
         }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException)
+        catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException or IOException)
         {
             Log.Write($"website GET {path} failed: {ex.GetBaseException().Message}");
             throw new SiteFeedException(Unreachable);
         }
+    }
+
+    /// <summary>
+    /// Reads the body of an answer of the website, giving up once the website stays silent for as
+    /// long as the client waits for an answer, so a connection that stalls never holds the reader
+    /// while a slow one that keeps sending finishes.
+    /// </summary>
+    /// <param name="response">The answer, sent with its headers read only.</param>
+    /// <param name="maxBytes">The largest body taken.</param>
+    /// <param name="http">The client, whose timeout bounds each wait for the next part of the body.</param>
+    /// <returns>The body; <see langword="null"/> when it is larger than <paramref name="maxBytes"/>.</returns>
+    /// <exception cref="OperationCanceledException">The website stayed silent too long.</exception>
+    internal static byte[]? ReadBody(HttpResponseMessage response, int maxBytes, HttpClient http)
+    {
+        if (response.Content.Headers.ContentLength > maxBytes)
+        {
+            return null;
+        }
+
+        using var silence = new CancellationTokenSource(http.Timeout);
+        using var stream = response.Content.ReadAsStream(silence.Token);
+        using var copy = new MemoryStream();
+        var buffer = new byte[81920];
+        int read;
+
+        while ((read = stream.ReadAsync(buffer, silence.Token).AsTask().GetAwaiter().GetResult()) > 0)
+        {
+            silence.CancelAfter(http.Timeout);
+            copy.Write(buffer, 0, read);
+
+            if (copy.Length > maxBytes)
+            {
+                return null;
+            }
+        }
+
+        return copy.ToArray();
     }
 
     /// <summary>

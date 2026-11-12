@@ -2,6 +2,7 @@
 //  SiteDownload.cs
 //
 //  Changelog:
+//      Paulinchen  2026-11-12: Gave up on a download once the website stays silent for a minute
 //      Paulinchen  2026-11-07: Used the bridge and the runtime under the framework's namespace
 //      Paulinchen  2026-11-06: Took downloads only from the website MGQ_MODS_SITE names when it is set, over its scheme
 //      Paulinchen  2026-10-30: Sent the install key as the bearer value of a mod's download
@@ -16,7 +17,6 @@ using System.IO;
 using System.Net;
 using System.Net.Http;
 using System.Security.Cryptography;
-using System.Threading.Tasks;
 using MGQParadox.ModFramework.Runtime;
 
 namespace MGQParadox.ModFramework.Mods;
@@ -48,9 +48,10 @@ internal static class SiteDownload
     public const int MaxRedirects = 3;
 
     /// <summary>
-    /// Follows no redirect by itself, so each one is checked.
+    /// Follows no redirect by itself, so each one is checked, and gives up once the website stays
+    /// silent for a minute, before its answer or between two parts of the file.
     /// </summary>
-    private static readonly HttpClient Http = new(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = TimeSpan.FromMinutes(5) };
+    private static readonly HttpClient Http = new(new HttpClientHandler { AllowAutoRedirect = false }) { Timeout = TimeSpan.FromMinutes(1) };
 
     /// <summary>
     /// Tells whether an address is on the website, over its scheme, HTTPS unless MGQ_MODS_SITE names another.
@@ -133,50 +134,22 @@ internal static class SiteDownload
                     throw new InvalidOperationException($"The website answered {(int)response.StatusCode}.");
                 }
 
-                if (response.Content.Headers.ContentLength > maxBytes)
+                if (SiteFeed.ReadBody(response, maxBytes, http) is not { } file)
                 {
-                    Log.Write($"download of {url} refused: {response.Content.Headers.ContentLength} bytes, more than {maxBytes}");
+                    Log.Write($"download of {url} refused: more than {maxBytes} bytes");
                     throw new InvalidOperationException(TooLarge(what, maxBytes));
                 }
 
-                return ReadAtMost(response.Content, what, maxBytes);
+                return file;
             }
         }
-        catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or IOException)
+        catch (Exception ex) when (ex is HttpRequestException or OperationCanceledException or IOException)
         {
             Log.Write($"download of {url} failed: {ex.GetBaseException().Message}");
             throw new InvalidOperationException("The website could not be reached.");
         }
 
         throw new InvalidOperationException($"The {what} was sent on too often.");
-    }
-
-    /// <summary>
-    /// Reads a response's file, stopping once it grows larger than the largest file taken.
-    /// </summary>
-    /// <param name="content">The response's content.</param>
-    /// <param name="what">What the file is, for the player.</param>
-    /// <param name="maxBytes">The largest file taken.</param>
-    /// <returns>The file.</returns>
-    /// <exception cref="InvalidOperationException">The file is too large.</exception>
-    private static byte[] ReadAtMost(HttpContent content, string what, int maxBytes)
-    {
-        using var stream = content.ReadAsStream();
-        using var copy = new MemoryStream();
-        var buffer = new byte[81920];
-        int read;
-
-        while ((read = stream.Read(buffer)) > 0)
-        {
-            copy.Write(buffer, 0, read);
-
-            if (copy.Length > maxBytes)
-            {
-                throw new InvalidOperationException(TooLarge(what, maxBytes));
-            }
-        }
-
-        return copy.ToArray();
     }
 
     /// <summary>
