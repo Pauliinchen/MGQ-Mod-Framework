@@ -50,7 +50,7 @@ Written `autocomplete label, ...`.
 | `bind:` | the name of a state |  |  | a state that holds its text, both ways |
 | `items:` | an Array of words, or a lambda of the word typed answering them |  |  | what it offers: an Array, narrowed to the items that hold the text anywhere, ignoring case, or a lambda of the text answering its own matches |
 | `placeholder:` | a text |  | yes | a dim text it shows while it is empty, also while the player types, such as "Search" |
-| `max_length:` | a whole number |  |  | the most characters it takes |
+| `max_length:` | a whole number |  |  | the most characters it takes, 10,000 when not given |
 | `required:` | any value |  |  | true, or the error to show, such as "Name the formation": an empty value is an error, "Required" by default |
 | `validate:` | a lambda of one item, or its method name |  |  | a lambda of its value answering the error to show, or nil while the value is fine, such as ->(name) { "Too short" if name.size < 3 }; a method name calls that method of the component |
 

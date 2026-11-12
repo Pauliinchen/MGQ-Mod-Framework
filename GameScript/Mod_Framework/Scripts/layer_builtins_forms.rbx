@@ -161,7 +161,7 @@ module Mod_Framework
                                                          :items => { :type => :completions, :required => true,
                                                                      :doc => "what it offers: an Array, narrowed to the items that hold the text anywhere, ignoring case, or a lambda of the text answering its own matches" },
                                                          :placeholder => { :kind => :live, :type => :text, :doc => "a dim text it shows while it is empty, also while the player types, such as \"Search\"" },
-                                                         :max_length => { :type => :int, :doc => "the most characters it takes" }).merge(FORM_INPUT),
+                                                         :max_length => { :type => :int, :doc => "the most characters it takes, 10,000 when not given" }).merge(FORM_INPUT),
                             :events => { :change => "its text, as the player typed it", :complete => "the match taken, which is its text now, and its place among the matches",
                                          :submit => "its text, as Enter gave it with no match lit" },
                             :keys => "typing as in a text field; Up and Down light a match, Enter or Tab takes it; the first cancel hides the matches and stops typing",

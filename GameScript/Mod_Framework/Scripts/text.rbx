@@ -637,14 +637,14 @@ module Mod_Framework
         # Opens a box in C#, the cursor at the text's end, and has the DLL take what is typed.
         #
         # @param text [String] The text.
-        # @param options [Hash] Whichever of :max_chars (the most characters it takes), :allowed (a
-        #   pattern of one character every typed character must match, in the syntax Ruby and .NET's
-        #   ECMAScript mode read alike, such as \d, \w and [a-z], but no POSIX brackets, \h or /x;
-        #   one they read apart fails the open and is logged), :mask (the character shown
-        #   for each, such as "*"), :echo ([Windows' code of the key that opened it, frames], whose
-        #   character it leaves out once), :alt_codes (frames after the left Alt in which typing is
-        #   dropped) and :number ([least, largest], each nil for none: the text stays a whole number,
-        #   characters that came together going in whole or not at all) apply.
+        # @param options [Hash] Whichever of :max_chars (the most characters it takes, 10,000 when not
+        #   given), :allowed (a pattern of one character every typed character must match, in the
+        #   syntax Ruby and .NET's ECMAScript mode read alike, such as \d, \w and [a-z], but no POSIX
+        #   brackets, \h or /x; one they read apart fails the open and is logged), :mask (the
+        #   character shown for each, such as "*"), :echo ([Windows' code of the key that opened it,
+        #   frames], whose character it leaves out once), :alt_codes (frames after the left Alt in
+        #   which typing is dropped) and :number ([least, largest], each nil for none: the text stays
+        #   a whole number, characters that came together going in whole or not at all) apply.
         def initialize(text = "", options = {})
           @text = text.to_s
           @cursor = @text.length

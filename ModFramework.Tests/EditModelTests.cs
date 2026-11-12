@@ -2,6 +2,7 @@
 //  EditModelTests.cs
 //
 //  Changelog:
+//      Paulinchen  2026-11-12: Checked a paste of a whole log into a box that sets no most, and the frames of a long text
 //      Paulinchen  2026-11-11: Handed the text box an input model
 //      Paulinchen  2026-11-07: Replaced the replay of the scripts' editor with one flow of typing, moving and erasing
 //                            - Used the bridge and the runtime under the framework's namespace
@@ -17,6 +18,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using MGQParadox.ModFramework.Bridge;
 using MGQParadox.ModFramework.Bridge.Ruby;
@@ -38,6 +40,12 @@ public sealed class EditModelTests
     /// The key bits of Home.
     /// </summary>
     private const int Home = (int)EditKeys.Home;
+
+    /// <summary>
+    /// The most milliseconds a frame of a box may take, far above a frame's work on any text and far
+    /// below the minutes a frame took when it measured the shown part again for every character.
+    /// </summary>
+    private const int FrameMilliseconds = 200;
 
     /// <summary>
     /// What the player types.
@@ -102,9 +110,9 @@ public sealed class EditModelTests
     /// <summary>
     /// Asserts that the keyboard takes typing only while a box is open, that a tick types what came
     /// from it and posts the text with what typing did, that Enter stops typing until the owner
-    /// acted, the rest refused in the next tick, that a quiet box posts nothing, and that closing a
-    /// box drops what waited, a tick of its id moving nothing in the next box, and closing a box no
-    /// longer open leaves the keyboard on for the one that is.
+    /// acted, the rest refused in the next tick as one refusal, that a quiet box posts nothing, and
+    /// that closing a box drops what waited, a tick of its id moving nothing in the next box, and
+    /// closing a box no longer open leaves the keyboard on for the one that is.
     /// </summary>
     [Fact]
     public void Typing_TakesTheKeyboardWhileABoxIsOpenAndStopsAtEnter()
@@ -118,7 +126,7 @@ public sealed class EditModelTests
 
         Assert.True(opened);
         Assert.Equal(("abcd", 4, new RubyArray { "typed", "typed", "enter" }, 6, 6), (first["text"].AsText(), first["cursor"].AsInt(), first["outcomes"], first["keys"].AsInt(), first["chars"].AsInt()));
-        Assert.Equal(("abcd", new RubyArray { "refused", "refused", "refused" }, 0), (second["text"].AsText(), second["outcomes"], second["keys"].AsInt()));
+        Assert.Equal(("abcd", new RubyArray { "refused" }, 0), (second["text"].AsText(), second["outcomes"], second["keys"].AsInt()));
         Assert.Empty(quiet);
 
         _keyboard.Typed.Enqueue(("a\rb", 3));
@@ -140,7 +148,8 @@ public sealed class EditModelTests
 
     /// <summary>
     /// Asserts that a box drawn on one line shows the part around the cursor with the cursor's place
-    /// in pixels, a password as stars, an empty mask as the text itself, and follows the keys; and
+    /// in pixels, a password as stars, an empty mask as the text itself, and follows the keys without
+    /// moving the part shown while the cursor stays in it; and
     /// that a box of several lines shows its lines, the first in sight, the cursor's line and its
     /// place, and scrolls by the wheel.
     /// </summary>
@@ -149,10 +158,12 @@ public sealed class EditModelTests
     {
         int masked = Open(new RubyHash { { "text", "abcdefgh" }, { "mask", "*" } });
         RubyHash drawn = View(masked, 35, 0);
+        RubyHash left = Event(_ui.Tick(new RubyHash { { "edit", new RubyArray { masked, (int)EditKeys.Left, 0, 0, 0 } } }));
         RubyHash home = Event(_ui.Tick(new RubyHash { { "edit", new RubyArray { masked, Home, 0, 0, 0 } } }));
         int plain = Open(new RubyHash { { "text", "abc" }, { "mask", "" } });
 
         Assert.Equal(new RubyArray { 5, 3, 30 }, drawn["view"].AsHash()["line"]);
+        Assert.Equal(new RubyArray { 5, 3, 20 }, left["view"].AsHash()["line"]);
         Assert.Equal(new RubyArray { 0, 3, 0 }, home["view"].AsHash()["line"]);
         Assert.Equal(new RubyArray { 0, 3, 30 }, View(plain, 100, 0)["view"].AsHash()["line"]);
 
@@ -163,6 +174,38 @@ public sealed class EditModelTests
         Assert.Equal(new RubyArray { new RubyArray { 0, 3 }, new RubyArray { 3, 3 }, new RubyArray { 6, 3 }, new RubyArray { 9, 2 } }, area[0]);
         Assert.Equal(new RubyArray { 2, 3, 20 }, new RubyArray { area[1], area[2], area[3] });
         Assert.Equal(new RubyArray { 1, 2, 20 }, new RubyArray { scrolled[1], scrolled[2], scrolled[3] });
+    }
+
+    /// <summary>
+    /// Asserts that a paste of a whole log into a box that sets no most stops at
+    /// <see cref="TextEditor.DefaultMaxChars"/> with one refusal, and that a box drawn on one line
+    /// keeps every frame quick on a far longer text its owner set, the cursor at the end, at the start
+    /// and resting there.
+    /// </summary>
+    [Fact]
+    public void LongText_StopsAtTheDefaultMostAndKeepsEveryFrameQuick()
+    {
+        int id = Open(new RubyHash { { "text", "" } });
+        _keyboard.Typed.Enqueue((new string('a', 1_000_000), 1));
+        RubyHash pasted = Event(_ui.Tick(Edit(id)));
+
+        Assert.Equal((TextEditor.DefaultMaxChars, 1), (pasted["text"].AsText().Length, pasted["outcomes"].AsArray().Count(outcome => outcome.AsText() == "refused")));
+
+        View(id, 300, 0);
+        const int Long = 200_000;
+        _ui.Context.Call(System.Text.Encoding.UTF8.GetBytes(EditModel.SetTopic), RubyMarshal.Write(new RubyHash { { "id", id }, { "text", new string('b', Long) }, { "cursor", 0 } }), new byte[256]);
+        var views = new List<RubyValue>();
+        long slowest = 0;
+        foreach (int keys in new[] { (int)EditKeys.End, Home, -1, -1, -1 })
+        {
+            var watch = Stopwatch.StartNew();
+            List<(string Topic, RubyValue Payload)> events = _ui.Tick(new RubyHash { { "edit", new RubyArray { id, keys, 0, 0, 0 } } });
+            slowest = Math.Max(slowest, watch.ElapsedMilliseconds);
+            views.AddRange(events.Where(item => item.Topic == EditModel.EventTopic).Select(item => item.Payload.AsHash()["view"].AsHash()["line"]));
+        }
+
+        Assert.Equal(new List<RubyValue> { new RubyArray { Long - 30, 30, 300 }, new RubyArray { 0, 30, 0 } }, views);
+        Assert.InRange(slowest, 0, FrameMilliseconds);
     }
 
     /// <summary>

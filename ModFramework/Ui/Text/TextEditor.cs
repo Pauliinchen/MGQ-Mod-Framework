@@ -2,6 +2,7 @@
 //  TextEditor.cs
 //
 //  Changelog:
+//      Paulinchen  2026-11-12: Took at most 10,000 characters when a box sets no most, and picked the part a box shows in one walk
 //      Paulinchen  2026-11-05: Kept a text to the rule of a whole number, and typed a paste into it whole or not at all
 //      Paulinchen  2026-10-28: Moved into the Mod Framework
 //      Paulinchen  2026-10-23: Created
@@ -84,6 +85,15 @@ public sealed class TextEditor
     public const int BlinkTicks = 30;
 
     /// <summary>
+    /// The most characters a text takes when its box sets no most.
+    /// </summary>
+    /// <remarks>
+    /// A paste of a whole log would otherwise grow the text, and the work every frame does on it,
+    /// without end.
+    /// </remarks>
+    public const int DefaultMaxChars = 10_000;
+
+    /// <summary>
     /// The code point of Enter as typed.
     /// </summary>
     private const int EnterPoint = '\r';
@@ -127,22 +137,22 @@ public sealed class TextEditor
     /// Starts editing a text, the cursor at its end.
     /// </summary>
     /// <param name="text">The text.</param>
-    /// <param name="maxChars">The most characters it takes, null for any number.</param>
+    /// <param name="maxChars">The most characters typing takes it to, null for <see cref="DefaultMaxChars"/>.</param>
     /// <param name="allowed">What every typed character must match, null for any.</param>
     /// <param name="number">The rule of a whole number the text must keep to, null for any text.</param>
     public TextEditor(string text, int? maxChars = null, Regex? allowed = null, NumberRule? number = null)
     {
         _text = [.. CodePoints.Of(text)];
-        MaxChars = maxChars;
+        MaxChars = maxChars ?? DefaultMaxChars;
         Allowed = allowed;
         Number = number;
         Cursor = _text.Count;
     }
 
     /// <summary>
-    /// Gets the most characters the text takes, null for any number.
+    /// Gets the most characters typing takes the text to.
     /// </summary>
-    public int? MaxChars { get; }
+    public int MaxChars { get; }
 
     /// <summary>
     /// Gets what every typed character must match, null for any.
@@ -211,7 +221,7 @@ public sealed class TextEditor
             return EditOutcome.None;
         }
 
-        if ((MaxChars is int most && _text.Count >= most) || (Allowed is not null && !Allowed.IsMatch(CodePoints.Text([point]))) || !NumberTakes(point))
+        if (_text.Count >= MaxChars || (Allowed is not null && !Allowed.IsMatch(CodePoints.Text([point]))) || !NumberTakes(point))
         {
             return EditOutcome.Refused;
         }
@@ -362,21 +372,26 @@ public sealed class TextEditor
     /// <returns>The first character shown and how many are shown.</returns>
     public TextSpan Visible(FontGlyphs glyphs, int width, int? mask = null)
     {
-        int[] display = mask is int star ? Array.ConvertAll(_text.ToArray(), _ => star) : [.. _text];
+        ArgumentNullException.ThrowIfNull(glyphs);
         if (Cursor < _first)
         {
             _first = Cursor;
         }
 
-        while (_first < Cursor && TextLayout.Width(glyphs, display.AsSpan(_first, Cursor - _first)) > width)
+        int used = 0;
+        int first = Cursor;
+        while (first > _first && used + glyphs.Width(mask ?? _text[first - 1]) <= width)
         {
-            _first++;
+            first--;
+            used += glyphs.Width(mask ?? _text[first]);
         }
 
-        int last = display.Length;
-        while (last > Cursor && TextLayout.Width(glyphs, display.AsSpan(_first, last - _first)) > width)
+        _first = first;
+        int last = Cursor;
+        while (last < _text.Count && used + glyphs.Width(mask ?? _text[last]) <= width)
         {
-            last--;
+            used += glyphs.Width(mask ?? _text[last]);
+            last++;
         }
 
         return new TextSpan(_first, last - _first);

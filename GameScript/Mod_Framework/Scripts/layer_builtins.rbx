@@ -1330,7 +1330,7 @@ module Mod_Framework
                                          :placeholder => { :kind => :live, :type => :text, :doc => "a dim text it shows while it is empty, also while the player types, such as \"Search\"" },
                                          :password => { :type => :bool, :default => false, :doc => "shows a * for each character" },
                                          :lines => { :type => :int, :default => 1, :doc => "its lines; with more than 1 it ends in ... while it does not type" },
-                                         :max_length => { :type => :int, :doc => "the most characters it takes" },
+                                         :max_length => { :type => :int, :doc => "the most characters it takes, 10,000 when not given" },
                                          :allowed => { :doc => "a Regexp of the characters it takes, such as /[0-9]/; any other plays the buzzer" },
                                          :read_only => { :type => :bool, :default => false, :doc => "it takes the focus and shows its text but takes no typing" },
                                          :confirm_to_type => { :type => :bool, :default => false,

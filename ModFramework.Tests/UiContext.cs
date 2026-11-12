@@ -2,6 +2,7 @@
 //  UiContext.cs
 //
 //  Changelog:
+//      Paulinchen  2026-11-12: Grew the drain buffer for a frame whose events do not fit, as the scripts do
 //      Paulinchen  2026-11-07: Used the bridge and the runtime under the framework's namespace
 //      Paulinchen  2026-10-28: Moved into the Mod Framework
 //      Paulinchen  2026-10-23: Created
@@ -23,9 +24,9 @@ namespace MGQParadox.ModFramework.Tests;
 internal sealed class UiContext
 {
     /// <summary>
-    /// The drain buffer, larger than any test's events.
+    /// The drain buffer, grown once a frame's events do not fit.
     /// </summary>
-    private readonly byte[] _drain = new byte[1 << 16];
+    private byte[] _drain = new byte[1 << 16];
 
     /// <summary>
     /// The reply buffer.
@@ -94,6 +95,12 @@ internal sealed class UiContext
     {
         Frame++;
         int length = Context.Drain(Frame, _drain);
+        if (length < 0)
+        {
+            _drain = new byte[-length];
+            length = Context.Drain(Frame, _drain);
+        }
+
         return length <= 0
             ? []
             : RubyMarshal.Read(_drain.AsSpan(0, length)).AsArray().Select(pair => (pair.AsArray()[0].AsText(), pair.AsArray()[1])).ToList();

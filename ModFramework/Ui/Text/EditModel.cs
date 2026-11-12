@@ -2,6 +2,7 @@
 //  EditModel.cs
 //
 //  Changelog:
+//      Paulinchen  2026-11-12: Told a run of refused characters, such as the rest of a paste past the most, as one refusal
 //      Paulinchen  2026-11-11: Moved the caret by no direction whose numpad digit typed in the same tick
 //      Paulinchen  2026-11-07: Used the bridge and the runtime under the framework's namespace
 //      Paulinchen  2026-11-05: Opened a box that types a whole number by its rule, typed what came in one tick into it as one,
@@ -406,12 +407,13 @@ internal sealed class EditModel : IUiModel
     /// <summary>
     /// Types what waits until Enter or Escape, which the owner acts on before the rest is typed. A box
     /// that types a whole number types the characters that came together as one, so a paste goes in
-    /// whole or not at all.
+    /// whole or not at all. Refused characters in a row tell one refusal.
     /// </summary>
     /// <param name="box">The box.</param>
     /// <param name="outcomes">Where what typing did goes.</param>
     private void TypePending(Box box, RubyArray outcomes)
     {
+        EditOutcome told = EditOutcome.None;
         while (_pending.Count > 0)
         {
             int point = _pending.Dequeue();
@@ -436,9 +438,10 @@ internal sealed class EditModel : IUiModel
                 outcome = box.Editor.Type(point);
             }
 
-            if (outcome != EditOutcome.None)
+            if (outcome != EditOutcome.None && !(outcome == EditOutcome.Refused && told == EditOutcome.Refused))
             {
                 outcomes.Add(NameOf(outcome));
+                told = outcome;
             }
 
             if (outcome is EditOutcome.Enter or EditOutcome.Escape)

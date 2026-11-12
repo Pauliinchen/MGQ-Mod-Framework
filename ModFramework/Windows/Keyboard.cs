@@ -2,6 +2,7 @@
 //  Keyboard.cs
 //
 //  Changelog:
+//      Paulinchen  2026-11-12: Cut a paste longer than 65,536 characters
 //      Paulinchen  2026-11-07: Used the bridge and the runtime under the framework's namespace
 //      Paulinchen  2026-10-28: Moved into the Mod Framework
 //      Paulinchen  2026-10-23: Dropped giving a take back, since the text box in C# takes it whole
@@ -33,6 +34,15 @@ internal static partial class Keyboard
     /// The character Ctrl+V types, which pastes the clipboard.
     /// </summary>
     private const char Paste = '\u0016';
+
+    /// <summary>
+    /// The most UTF-16 characters a paste takes from the clipboard.
+    /// </summary>
+    /// <remarks>
+    /// The game runs as a 32-bit process, and every copy on the way into a text box would otherwise
+    /// be as large as whatever was copied, such as a log of tens of megabytes.
+    /// </remarks>
+    private const int PasteMost = 65_536;
 
     /// <summary>
     /// Asks ToUnicodeEx to leave the keyboard's state alone, so RGSS's own translating stays as it is.
@@ -150,11 +160,27 @@ internal static partial class Keyboard
 
         if (typed.Contains(Paste))
         {
-            var pasted = new string((Clipboard.GetText() ?? string.Empty).Where(character => !char.IsControl(character)).ToArray());
-            typed = typed.Replace(Paste.ToString(), pasted);
+            typed = typed.Replace(Paste.ToString(), Pasted());
         }
 
         return (typed, pressed);
+    }
+
+    /// <summary>
+    /// Reads what a paste types: the clipboard's text, cut to <see cref="PasteMost"/>, without control characters.
+    /// </summary>
+    /// <returns>The text.</returns>
+    private static string Pasted()
+    {
+        string clipboard = Clipboard.GetText() ?? string.Empty;
+        if (clipboard.Length > PasteMost)
+        {
+            int end = char.IsHighSurrogate(clipboard[PasteMost - 1]) ? PasteMost - 1 : PasteMost;
+            Log.Write($"keyboard: cut a paste of {clipboard.Length} characters to {end}");
+            clipboard = clipboard[..end];
+        }
+
+        return new string(clipboard.Where(character => !char.IsControl(character)).ToArray());
     }
 
     /// <summary>

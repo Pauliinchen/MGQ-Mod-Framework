@@ -127,7 +127,7 @@ Written `text_field label, ...`.
 | `placeholder:` | a text |  | yes | a dim text it shows while it is empty, also while the player types, such as "Search" |
 | `password:` | true, false | `false` |  | shows a * for each character |
 | `lines:` | a whole number | `1` |  | its lines; with more than 1 it ends in ... while it does not type |
-| `max_length:` | a whole number |  |  | the most characters it takes |
+| `max_length:` | a whole number |  |  | the most characters it takes, 10,000 when not given |
 | `allowed:` | any value |  |  | a Regexp of the characters it takes, such as /[0-9]/; any other plays the buzzer |
 | `read_only:` | true, false | `false` |  | it takes the focus and shows its text but takes no typing |
 | `confirm_to_type:` | true, false | `false` |  | the focus rests on it until confirm or a click starts typing; cancel then puts the text back |
